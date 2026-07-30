@@ -29,7 +29,7 @@ function getGenAIClient(customApiKey?: string) {
     : process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY environment variable or custom API key is required');
+    throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다. Vercel Settings -> Environment Variables 또는 앱 상단에서 API Key를 입력해 주세요.');
   }
   return new GoogleGenAI({
     apiKey,
