@@ -100,6 +100,363 @@ export const INITIAL_EBS_DATASET: EBSPassage[] = [
       { word: "cooperate", meaning: "협력하다" }
     ]
   },
+  {
+    id: "26053-0201",
+    lesson: "실전 3회",
+    itemNo: "32번",
+    type: "빈칸 추론",
+    title: "과거 기후 데이터 복원을 통한 미래 기후 예측의 중요성",
+    passage: `Reconstructing past climate conditions is essential for understanding the mechanisms driving global climate change. Paleoclimatologists use proxies—such as ice cores, tree rings, and ocean sediments—to infer temperatures and atmospheric compositions from thousands or even millions of years ago. These natural archives provide a baseline against which modern climatic shifts can be measured. Without this historical perspective, it would be virtually impossible to determine whether current global warming trends are unprecedented or merely part of natural climatic oscillations. Furthermore, long-term climate records allow scientists to test and refine computer models that forecast future environmental scenarios. Ultimately, analyzing past climate data enables researchers to ________________________ with greater accuracy and confidence.`,
+    translation: `과거 기후 조건을 복원하는 것은 지구 기후 변화를 이끄는 메커니즘을 이해하는 데 필수적이다. 고기후학자들은 빙하 코어, 나이테, 해양 침전물과 같은 프록시(대리 지표)를 사용하여 수천 년 또는 수백만 년 전의 온도와 대기 조성을 추정한다. 이러한 자연의 기록보관소는 현대 기후 변화를 측정할 수 있는 기준선(baseline)을 제공한다. 이러한 역사적 관점이 없다면 현재의 지구 온난화 경향이 전례가 없는 것인지 아니면 단순히 자연적 기후 진동의 일부인지 판단하는 것이 사실상 불가능할 것이다. 나아가 장기 기후 기록은 과학자들이 미래 환경 시나리오를 예측하는 컴퓨터 모델을 검증하고 개선할 수 있게 해준다. 궁극적으로 과거 기후 데이터를 분석하는 것은 연구자들이 더 높은 정확성과 신뢰성으로 ________________________ 수 있게 해준다.`,
+    options: [
+      "① forecast potential climate trajectories",
+      "② preserve endangered marine ecosystems",
+      "③ accelerate renewable energy development",
+      "④ reduce industrial carbon emissions",
+      "⑤ ignore short-term weather fluctuations"
+    ],
+    answerIndex: 0,
+    explanation: "과거 기후 프록시 데이터(빙하 코어, 나이테 등)를 통해 기후의 변화 패턴과 기준선을 파악하고 컴퓨터 시뮬레이션 모델을 정교화함으로써, 미래의 환경 및 기후 변화 궤적을 더 정확하게 예측할 수 있다는 내용이므로 빈칸에는 ① '잠재적인 기후 궤적을 예측하다(forecast potential climate trajectories)'가 들어가는 것이 가장 적절합니다.",
+    syntaxNotes: [
+      "Paleoclimatologists use proxies ... [to infer temperatures and atmospheric compositions...]. (to infer는 목적을 나타내는 부사적 용법의 부정사입니다.)",
+      "Without this historical perspective, it would be virtually impossible [to determine whether current global warming trends are unprecedented...]. (가정법 과거 구문 [Without = If it were not for]과 가주어-진주어 구문이 결합되어 있습니다.)"
+    ],
+    vocabList: [
+      { word: "paleoclimatologist", meaning: "고기후학자" },
+      { word: "proxy", meaning: "대리 지표, 프록시" },
+      { word: "sediment", meaning: "침전물, 퇴적물" },
+      { word: "baseline", meaning: "기준선, 기준점" },
+      { word: "unprecedented", meaning: "전례 없는" },
+      { word: "oscillation", meaning: "변동, 진동" },
+      { word: "trajectory", meaning: "궤적, 경로" }
+    ]
+  },
+  {
+    id: "26053-0202",
+    lesson: "실전 3회",
+    itemNo: "33번",
+    type: "빈칸 추론",
+    title: "과학적 발견에서 가설의 우연적 검증과 열린 탐색 자세",
+    passage: `Serendipity plays a significant role in scientific discovery, but it rarely favors an unprepared mind. Great breakthroughs often occur when scientists notice unexpected anomalies during routine experiments. Instead of discarding strange results as mere errors, perceptive researchers investigate the underlying causes. This process requires a delicate balance between theoretical rigor and cognitive flexibility. If scientists strictly adhere to pre-existing hypotheses without room for surprise, they risk missing revolutionary insights. As Louis Pasteur famously remarked, chance favors only the prepared mind. Therefore, progress in science relies not only on systematic hypothesis testing, but also on the willingness of researchers to ________________________.`,
+    translation: `우연한 발견(세렌디피티)은 과학적 발견에서 중요한 역할을 하지만, 준비되지 않은 마음에는 거의 찾아오지 않는다. 위대한 획기적 발판은 대개 과학자들이 일상적인 실험 중에 예상치 못한 이상 현상(anomalies)을 포착할 때 발생한다. 통찰력 있는 연구자들은 이상한 결과를 단지 오류로 치부해 버리는 대신, 그 근본 원인을 탐구한다. 이 과정은 이론적 엄격함과 인지적 유연성 사이의 미묘한 균형을 필요로 한다. 만약 과학자들이 뜻밖의 결과에 대한 여지 없이 기존 가설에만 엄격하게 집착한다면, 혁신적인 통찰을 놓칠 위험이 있다. 루이 파스퇴르가 유명하게 말했듯, 기회는 준비된 마음만을 따르는 법이다. 따라서 과학의 발전은 체계적인 가설 검증뿐만 아니라 연구자들이 ________________________ 기꺼이 하는 태도에 의존한다.`,
+    options: [
+      "① stick strictly to original experimental protocols",
+      "② embrace unexpected findings and alter their perspective",
+      "③ avoid collaborating with scientists from other fields",
+      "④ publish results immediately without peer review",
+      "⑤ rely solely on computer-simulated models"
+    ],
+    answerIndex: 1,
+    explanation: "과학적 혁신은 단순한 체계적 가설 검증뿐만 아니라, 예상치 못한 이상 결과(anomalies)나 우연한 일탈을 관찰했을 때 이를 버리지 않고 인지적 유연성을 가지고 탐구하려는 태도에서 비롯된다는 글의 중심 내용입니다. 따라서 빈칸에는 ② '예상치 못한 발견을 포용하고 관점을 바꾸다(embrace unexpected findings and alter their perspective)'가 가장 적절합니다.",
+    syntaxNotes: [
+      "Instead of discarding strange results as mere errors, perceptive researchers investigate... (Instead of ~ing 구문으로 '~하는 대신에'를 나타냅니다.)",
+      "If scientists strictly adhere to pre-existing hypotheses ..., they risk [missing revolutionary insights]. (risk + 동명사 구문으로 '~할 위험을 무릅쓰다'를 뜻합니다.)"
+    ],
+    vocabList: [
+      { word: "serendipity", meaning: "우연한 발견, 세렌디피티" },
+      { word: "anomaly", meaning: "이상 현상, 변칙" },
+      { word: "discard", meaning: "버리다, 치우다" },
+      { word: "perceptive", meaning: "통찰력 있는, 감각이 예리한" },
+      { word: "adhere to", meaning: "~에 고수하다, 집착하다" },
+      { word: "cognitive flexibility", meaning: "인지적 유연성" }
+    ]
+  },
+  {
+    id: "26053-0203",
+    lesson: "실전 3회",
+    itemNo: "34번",
+    type: "빈칸 추론",
+    title: "디지털 환경에서 아카이브 보존과 디지털 휘발성",
+    passage: `In the digital age, information appears virtually indestructible because digital files can be copied indefinitely without degradation. However, digital preservation presents a paradox: digital formats become obsolete far more rapidly than physical paper or stone inscriptions. Software updates, hardware evolution, and cloud platform closures constantly threaten the accessibility of digital records. Without active migration and digital curation, data stored on obsolete magnetic tapes or outdated file formats can become completely unreadable within just a decade or two. Consequently, preserving digital heritage requires continuous maintenance rather than passive storage, demonstrating that digital longevity actually depends on ________________________.`,
+    translation: `디지털 시대에는 디지털 파일이 품질 저하 없이 무한히 복사될 수 있기 때문에 정보가 사실상 파괴 불가능해 보인다. 그러나 디지털 보존은 하나의 역설을 제시한다. 디지털 포맷은 종이나 석판 각인보다 훨씬 빠르게 진부화(노후화)된다. 소프트웨어 업데이트, 하드웨어 진화, 클라우드 플랫폼 폐쇄는 디지털 기록의 접근성을 끊임없이 위협한다. 적극적인 데이터 이전과 디지털 큐레이션이 없다면 구식 자기 테이프나 진부한 파일 형식에 저장된 데이터는 단 10~20년 만에 완전히 읽을 수 없게 될 수 있다. 결과적으로 디지털 유산을 보존하는 것은 수동적 보관이 아닌 지속적인 관리를 필요로 하며, 이는 디지털 데이터의 수명이 실제로 ________________________에 달려 있음을 보여준다.`,
+    options: [
+      "① the physical strength of storage media",
+      "② constant human intervention and technical updates",
+      "③ stopping technological advancement altogether",
+      "④ restricting public access to online databases",
+      "⑤ relying exclusively on offline paper archives"
+    ],
+    answerIndex: 1,
+    explanation: "디지털 데이터는 영구 보존이 가능해 보이지만, 포맷과 하드웨어의 빠른 노후화 때문에 수동적 저장에 그치지 않고 인간의 지속적인 데이터 이전, 큐레이션, 관리가 이루어져야만 데이터가 지속될 수 있다는 내용입니다. 따라서 빈칸에는 ② '지속적인 인간의 개입과 기술적 업데이트(constant human intervention and technical updates)'가 적절합니다.",
+    syntaxNotes: [
+      "...digital formats become obsolete far more rapidly [than physical paper or stone inscriptions]. (비교급 far more ~ than 구문으로 far가 비교급을 강조합니다.)",
+      "Without active migration and digital curation, data [stored on obsolete magnetic tapes...] can become completely unreadable... (stored는 과거분사로 data를 후의수식합니다.)"
+    ],
+    vocabList: [
+      { word: "indestructible", meaning: "파괴할 수 없는" },
+      { word: "degradation", meaning: "품질 저하, 쇠퇴" },
+      { word: "obsolete", meaning: "구식의, 더 이상 안 쓰이는" },
+      { word: "inscription", meaning: "비문, 각인" },
+      { word: "curation", meaning: "큐레이션, 수집 관리" },
+      { word: "longevity", meaning: "수명, 장수" }
+    ]
+  },
+  {
+    id: "26053-0204",
+    lesson: "실전 3회",
+    itemNo: "35번",
+    type: "무관한 문장",
+    title: "시각적 착시(Optical Illusions)와 뇌의 인지 해석 과정",
+    passage: `Optical illusions occur when there is a mismatch between physical reality and our visual perception. These visual phenomena provide valuable insights into how the brain processes sensory input. ① Rather than acting like a simple camera recording raw light, the brain actively interprets visual information based on context, expectation, and past experience. ② For instance, when looking at ambiguous geometric patterns, the brain makes educated guesses to construct a coherent three-dimensional representation. ③ Geometric art has gained popularity in modern interior design due to its clean lines and aesthetic simplicity. ④ This reconstructive process explains why two people can view the exact same image yet perceive dramatically different shapes or shades. ⑤ Thus, optical illusions highlight the active, constructive nature of human perception rather than passive reception.`,
+    translation: `시각적 착시(Optical illusions)는 물리적 현실과 우리의 시각적 지각 사이에 불일치가 있을 때 발생한다. 이러한 시각적 현상은 뇌가 감각 입력을 어떻게 처리하는지에 대한 귀중한 통찰을 제공한다. ① 뇌는 빛 그대로를 기록하는 단순한 카메라처럼 작동하기보다는 맥락, 기대, 과거 경험에 기반하여 시각 정보를 적극적으로 해석한다. ② 예를 들어 기하학적 모호 패턴을 볼 때, 뇌는 일관된 3차원 표현을 구성하기 위해 박식한 추측을 한다. ③ (기하학적 미술은 깔끔한 선과 미학적 단순함 덕분에 현대 인테리어 디자인에서 인기를 얻었다.) ④ 이러한 재구성 과정은 왜 두 사람이 완전히 동일한 이미지를 보면서도 극적으로 다른 모양이나 명암을 인지할 수 있는지를 설명해 준다. ⑤ 따라서 시각적 착시는 수동적인 수용이 아닌 인간 지각의 능동적이고 구성적인 본질을 부각시킨다.`,
+    options: [
+      "① Rather than acting like a simple camera...",
+      "② For instance, when looking at ambiguous...",
+      "③ Geometric art has gained popularity in modern interior design...",
+      "④ This reconstructive process explains why two people...",
+      "⑤ Thus, optical illusions highlight the active..."
+    ],
+    answerIndex: 2,
+    explanation: "착시 현상을 통해 뇌가 감각 정보를 수동적으로 받아들이지 않고 주관적 맥락과 기대에 따라 능동적으로 재구성한다는 인지적 기제를 설명하는 글입니다. ③번 문장은 현대 인테리어 디자인에서의 기하학 예술의 인기에 관한 내용으로, 뇌의 시각 지각 처리 기제라는 전체 흐름에서 벗어나므로 무관한 문장입니다.",
+    syntaxNotes: [
+      "Rather than acting like a simple camera ..., the brain actively interprets visual information... (Rather than + 동명사 구문입니다.)",
+      "This reconstructive process explains [why two people can view the exact same image yet perceive dramatically different shapes...]. (explains의 목적어로 간접의문문 why절이 쓰였습니다.)"
+    ],
+    vocabList: [
+      { word: "optical illusion", meaning: "시각적 착시" },
+      { word: "mismatch", meaning: "부조화, 불일치" },
+      { word: "sensory input", meaning: "감각 입력" },
+      { word: "ambiguous", meaning: "모호한, 다의적인" },
+      { word: "coherent", meaning: "일관성 있는, 통일된" },
+      { word: "reconstructive", meaning: "재구성적인" }
+    ]
+  },
+  {
+    id: "26053-0205",
+    lesson: "실전 3회",
+    itemNo: "36번",
+    type: "글의 순서",
+    title: "도시 열섬 현상(Urban Heat Island Effect)과 녹지 조성",
+    passage: `The Urban Heat Island (UHI) effect is a phenomenon where urban areas experience significantly higher temperatures than surrounding rural areas. This temperature disparity is primarily caused by dense concentrations of concrete, asphalt, and tall buildings that absorb and retain solar heat.
+
+(A) In addition to structural heat absorption, human activities such as industrial machinery, vehicle emissions, and air conditioning systems generate substantial waste heat, further intensifying urban warming.
+(B) To mitigate these elevated temperatures, urban planners are increasingly implementing green infrastructure solutions. Planting trees, installing green roofs, and expanding public parks help cool cities through shade and evapotranspiration.
+(C) These natural cooling mechanisms not only lower ambient air temperatures but also reduce energy consumption needed for cooling buildings during hot summer months.`,
+    translation: `도시 열섬(UHI) 현상은 도시 지역이 주변 시골 지역보다 현저히 높은 기온을 겪는 현상이다. 이러한 온도 차이는 주로 태양열을 흡수하고 보유하는 콘크리트, 아스팔트, 높은 건물의 조밀한 집약 때문에 발생한다.
+
+(A) 구조적 열 흡수에 더해, 산업 기계, 자동차 배가스, 에어컨 시스템과 같은 인간 활동은 상당한 인공 폐열을 발생시켜 도시 온난화를 더욱 심화시킨다.
+(B) 이러한 상승된 온도를 완화하기 위해 도시 계획가들은 녹색 기반 시설 솔루션을 점점 더 도입하고 있다. 나무를 심고, 옥상 정원을 설치하고, 공공 공원을 확장하는 것은 그늘과 증발산 작용을 통해 도시를 식히는 데 도움이 된다.
+(C) 이러한 자연적 냉각 메커니즘은 주변 공기 온도를 낮출 뿐만 아니라 더운 여름철 동안 건물을 냉각하는 데 필요한 에너지 소비도 줄여준다.`,
+    options: [
+      "① (A) - (C) - (B)",
+      "② (B) - (A) - (C)",
+      "③ (B) - (C) - (A)",
+      "④ (A) - (B) - (C)",
+      "⑤ (C) - (A) - (B)"
+    ],
+    answerIndex: 3,
+    explanation: "주어진 글에서 도시 열섬 현상의 일차적 원인(건물/도로의 열 흡수)을 제시한 후, 'In addition to structural heat absorption'이라는 연결어를 통해 추가 원인(인공 폐열 발생)을 설명하는 (A)가 이어집니다. 그 후 이러한 열섬 현상을 해결하기 위한 완화책으로 녹지 조성을 언급하는 (B)가 오고, (B)의 녹지 메커니즘을 'These natural cooling mechanisms'로 받아 에너지 절감 효과를 덧붙이는 (C)로 마무리되는 ④ (A) - (B) - (C) 가 올바른 순서입니다.",
+    syntaxNotes: [
+      "The Urban Heat Island (UHI) effect is a phenomenon [where urban areas experience significantly higher temperatures...]. (관계부사 where절이 선행사 phenomenon을 수식합니다.)",
+      "These natural cooling mechanisms [not only lower ambient air temperatures but also reduce energy consumption...]. (not only A but also B 구문으로 동사 lower와 reduce가 병렬 연결되었습니다.)"
+    ],
+    vocabList: [
+      { word: "urban heat island", meaning: "도시 열섬" },
+      { word: "disparity", meaning: "격차, 불균형" },
+      { word: "mitigate", meaning: "완화하다, 줄이다" },
+      { word: "evapotranspiration", meaning: "증발산(증발+증산 작용)" },
+      { word: "ambient", meaning: "주위의, 잔잔한" }
+    ]
+  },
+  {
+    id: "26053-0206",
+    lesson: "실전 3회",
+    itemNo: "37번",
+    type: "글의 순서",
+    title: "소리(음향) 전달과 매질의 밀도 차이",
+    passage: `Sound travels as mechanical waves through different physical mediums, requiring matter to transmit its vibrational energy. The speed at which sound travels depends heavily on the density and elasticity of the medium.
+
+(A) In solids, such as iron or wood, molecules are tightly packed together, allowing acoustic vibrations to pass rapidly from one particle to the next. Consequently, sound moves much faster through solids than through liquids or gases.
+(B) Gases, on the other hand, have widely spaced molecules, which results in slower wave transmission. Air, for example, conducts sound at roughly 343 meters per second, a fraction of its speed in steel.
+(C) Understanding these transmission differences is crucial for acoustic engineering. Engineers design noise barrier walls and soundproofing materials by choosing substances that absorb or reflect specific vibrational frequencies.`,
+    translation: `소리는 다양한 물리적 매질을 통해 기계적 파동으로 이동하며, 진동 에너지를 전달하기 위해 물질을 필요로 한다. 소리가 이동하는 속도는 매질의 밀도와 탄성에 크게 의존한다.
+
+(A) 철이나 나무 같은 고체에서는 분자들이 빽빽하게 뭉쳐 있어서 음향 진동이 한 입자에서 다음 입자로 빠르게 전달될 수 있다. 결과적으로 소리는 액체나 기체보다 고체를 통해 훨씬 빠르게 이동한다.
+(B) 반면에 기체는 분자 간격이 넓게 떨어져 있어서 더 느린 파동 전달을 초래한다. 예를 들어 공기는 소리를 초당 약 343미터로 전달하는데, 이는 강철에서의 속도의 극히 일부분에 불과하다.
+(C) 이러한 전달 차이를 이해하는 것은 음향 공학에서 매우 중요하다. 엔지니어들은 특정 진동 주파수를 흡수하거나 반사하는 물질을 선택하여 방음벽과 음향 차단 재료를 설계한다.`,
+    options: [
+      "① (A) - (B) - (C)",
+      "② (A) - (C) - (B)",
+      "③ (B) - (A) - (C)",
+      "④ (B) - (C) - (A)",
+      "⑤ (C) - (A) - (B)"
+    ],
+    answerIndex: 0,
+    explanation: "소리의 전파가 매질의 밀도에 의존한다는 주어진 글 뒤에, 밀도가 높은 고체에서의 빠른 소리 전파를 설명하는 (A)가 오고, 'Gases, on the other hand'로 대조하며 밀도가 낮은 기체에서의 느린 소리 전파를 다루는 (B)가 이어지며, 이러한 매질별 전달 차이(these transmission differences)를 음향 공학의 방음 재료 설계에 응용함을 정리하는 (C)로 끝맺는 ① (A) - (B) - (C) 가 올바른 순서입니다.",
+    syntaxNotes: [
+      "The speed [at which sound travels] depends heavily on the density... (전치사+관계대명사 at which 구문이 speed를 수식합니다.)",
+      "In solids ..., molecules are tightly packed together, [allowing acoustic vibrations to pass rapidly...]. (allowing은 결과를 나타내는 분사구문이며 allow + O + to V 형식을 취합니다.)"
+    ],
+    vocabList: [
+      { word: "medium", meaning: "매질, 수단" },
+      { word: "vibrational energy", meaning: "진동 에너지" },
+      { word: "acoustic", meaning: "음향의, 소리의" },
+      { word: "elasticity", meaning: "탄성, 탄력성" },
+      { word: "soundproofing", meaning: "방음, 차음" }
+    ]
+  },
+  {
+    id: "26053-0207",
+    lesson: "실전 3회",
+    itemNo: "38번",
+    type: "문장 삽입",
+    title: "동물 무리의 동기화된 집단 행동과 상명하달식 리더의 부재",
+    passage: `Flocks of birds and schools of fish display astonishing coordination during collective movement. Thousands of individuals move in perfect unison, changing direction instantaneously without colliding. ( ① ) Early naturalists believed these movements were orchestrated by a designated group leader sending signals. ( ② ) Modern computational models reveal that complex collective behavior emerges from simple, local interaction rules followed by each individual. ( ③ ) Each bird or fish simply adjusts its velocity based on its immediate neighbors, maintaining a minimum distance while matching speed and alignment. ( ④ ) No central control or master mind is required to achieve this harmonious group flight. ( ⑤ ) Consequently, even minor local adjustments by a few individuals can ripple rapidly through the entire group, giving the illusion of a single conscious entity.`,
+    boxSentence: `Recent mathematical simulations have disproved this top-down command theory, demonstrating that no leader is necessary.`,
+    translation: `새 떼와 물고기 떼는 집단 이동 동안 놀라운 조화를 보여준다. 수천 마리의 개체들이 충돌 없이 즉각 방향을 바꾸며 완벽한 일치 속에서 움직인다. ( ① ) 초기 자연학자들은 이러한 움직임이 신호를 보내는 지정된 집단 리더에 의해 지휘된다고 믿었다. <u class="font-bold underline decoration-blue-500">[최근의 수학적 시뮬레이션은 이러한 상명하달식 명령 이론이 틀렸음을 입증하며, 리더가 전혀 필요하지 않음을 보여주었다.]</u> ( ② ) 현대의 컴퓨터 모델은 복잡한 집단 행동이 각 개체가 따르는 단순하고 국소적인 상호작용 규칙에서 출현함을 밝혀낸다. ( ③ ) 각 새나 물고기는 속도와 정렬을 맞추면서 최소 거리를 유지한 채, 가장 가까운 이웃들에 기반해 자신의 속도를 조절할 뿐이다. ( ④ ) 이러한 조화로운 집단 비행을 달성하는 데 중앙 통제나 총괄 지휘자는 필요하지 않다. ( ⑤ ) 결과적으로 몇몇 개체의 작은 국소적 조절조차 집단 전체로 신속히 파급되어 하나의 단일한 의식적 존재라는 착각을 준다.`,
+    options: [
+      "①",
+      "②",
+      "③",
+      "④",
+      "⑤"
+    ],
+    answerIndex: 1,
+    explanation: "①번 위치 바로 앞의 'Early naturalists believed these movements were orchestrated by a designated group leader...'는 과거의 리더 존재설(상명하달식 이론)을 언급합니다. 박스 문장의 'this top-down command theory'는 바로 이 과거 자연학자들의 이론을 지칭하므로 박스 문장은 ②번 위치에 들어가야 하며, ②번 뒤에서 리더 없이 자율적으로 나타나는 현대의 복잡계 계산 모델(computational models)로 논지가 자연스럽게 이어집니다.",
+    syntaxNotes: [
+      "Recent mathematical simulations have disproved this top-down command theory, [demonstrating that no leader is necessary]. (demonstrating은 결과를 설명하는 분사구문입니다.)",
+      "No central control or master mind is required [to achieve this harmonious group flight]. (to achieve는 목적을 나타내는 부사적 용법의 부정사입니다.)"
+    ],
+    vocabList: [
+      { word: "unison", meaning: "조화, 일치" },
+      { word: "orchestrate", meaning: "조직화하다, 지휘하다" },
+      { word: "top-down", meaning: "상명하달식의" },
+      { word: "ripple", meaning: "잔물결을 이루다, 파급되다" },
+      { word: "entity", meaning: "독립체, 존재" }
+    ]
+  },
+  {
+    id: "26053-0208",
+    lesson: "실전 3회",
+    itemNo: "39번",
+    type: "문장 삽입",
+    title: "경제적 인센티브와 내재적 동기(Intrinsic Motivation)의 상충",
+    passage: `Offering financial incentives is a standard managerial strategy used to boost performance and encourage productivity. Employers assume that monetary rewards will naturally motivate workers to put forth extra effort. ( ① ) In many routine tasks, financial bonuses do indeed lead to higher output and speed. ( ② ) However, when tasks require creative problem-solving or intrinsic interest, cash rewards can produce unexpected negative consequences. ( ③ ) Psychological research indicates that introducing extrinsic rewards for inherently satisfying tasks can reduce an individual's internal drive, a phenomenon known as the overjustification effect. ( ④ ) When people begin to view an activity as a means to earn money rather than a source of personal fulfillment, their engagement often declines once the reward is removed. ( ⑤ ) Thus, organizations must carefully evaluate task characteristics before applying financial incentives.`,
+    boxSentence: `This external pressure often crowds out genuine enthusiasm, making the task feel like a burdensome obligation rather than a rewarding pursuit.`,
+    translation: `금전적 인센티브를 제공하는 것은 성과를 올리고 생산성을 독려하기 위해 사용되는 표준적인 경영 전략이다. 고용주들은 금전적 보상이 근로자들로 하여금 자연스럽게 추가적인 노력을 기울이도록 동기부여할 것이라고 가정한다. ( ① ) 많은 정형화된 업무에서 금전적 보너스는 실제로 더 높은 산출량과 속도로 이어진다. ( ② ) 하지만 업무가 창의적인 문제 해결이나 내재적 흥미를 필요로 할 때, 현금 보상은 예상치 못한 부작용을 낳을 수 있다. ( ③ ) 심리학 연구는 본질적으로 만족스러운 업무에 외재적 보상을 도입하는 것이 개인이 가진 내부 동기를 감소시킬 수 있음을 보여주며, 이는 과잉 정당화 효과(overjustification effect)로 알려진 현상이다. <u class="font-bold underline decoration-blue-500">[이러한 외적 압박은 흔히 진정한 열정을 밀어내어, 그 업무를 보람 있는 추구라기보다는 부담스러운 의무처럼 느끼게 만든다.]</u> ( ④ ) 사람들이 어떤 활동을 개인적 성취의 원천이라기보다는 돈을 벌기 위한 수단으로 보기 시작할 때, 보상이 제거되면 그들의 참여도는 흔히 감소한다. ( ⑤ ) 따라서 조직은 금전적 인센티브를 적용하기 전에 업무 특성을 신중히 평가해야 한다.`,
+    options: [
+      "①",
+      "②",
+      "③",
+      "④",
+      "⑤"
+    ],
+    answerIndex: 3,
+    explanation: "③번 위치 뒤의 문장에서 외재적 보상이 내재적 동기를 떨어뜨리는 '과잉 정당화 효과'를 언급하고 있습니다. 박스 문장의 'This external pressure'는 바로 이 외재적 보상으로 인한 외적 압박을 가리키며, 순수한 열정을 밀어내고 과업을 부담스러운 의무로 느끼게 만든다는 부연을 제공하므로 ④번 위치에 들어가는 것이 가장 자연스럽습니다.",
+    syntaxNotes: [
+      "Psychological research indicates [that introducing extrinsic rewards for inherently satisfying tasks can reduce an individual's internal drive]... (that절이 indicates의 목적어 역할을 합니다.)",
+      "This external pressure often crowds out genuine enthusiasm, [making the task feel like a burdensome obligation...]. (making은 결과를 나타내는 분사구문이며 make + O + OC[동사원형] 구조입니다.)"
+    ],
+    vocabList: [
+      { word: "extrinsic reward", meaning: "외재적 보상" },
+      { word: "overjustification effect", meaning: "과잉 정당화 효과" },
+      { word: "crowd out", meaning: "밀어내다, 제쳐놓다" },
+      { word: "burdensome", meaning: "부담스러운" },
+      { word: "fulfillment", meaning: "성취, 충족" }
+    ]
+  },
+  {
+    id: "26053-0209",
+    lesson: "실전 3회",
+    itemNo: "40번",
+    type: "요약문 완성",
+    title: "식물의 휘발성 유기화합물(VOCs)을 통한 방어 및 화학적 대화",
+    passage: `When plants are attacked by herbivorous insects, they do not suffer passively. Instead, they emit airborne chemical signals known as volatile organic compounds (VOCs). These chemical messages serve a dual function in plant defense strategy. First, they alert neighboring plants of the same or different species to the presence of predators, prompting them to preemptively produce defensive toxins or bitter chemicals in their leaves. Second, VOCs act as chemical distress calls that attract natural predators of the attacking insects, such as parasitic wasps or predatory mites. Through this intricate chemical communication network, plants coordinate collective defenses and recruit external bodyguard species to ensure survival.`,
+    summarySentence: `Plants attacked by pests release airborne chemicals that (A) [warn] neighboring plants to activate defenses and simultaneously (B) [attract] natural predators to eliminate the threat.`,
+    translation: `식물이 초식 곤충에게 공격받을 때, 식물들은 수동적으로 고통받지만은 않는다. 대신 식물은 휘발성 유기화합물(VOCs)로 알려진 공기 중 화학 신호를 방출한다. 이러한 화학적 메시지는 식물의 방어 전략에서 두 가지 기능을 수행한다. 첫째, 이 신호는 같은 종이나 다른 종의 이웃 식물들에게 포식자의 존재를 알리어, 잎에 방어용 독소나 쓴 화학 물질을 선제적으로 생성하도록 유도한다. 둘째, VOCs는 기생 벌이나 포식성 응애와 같이 공격하는 곤충의 천적을 유인하는 화학적 구조 요청 역할을 한다. 이러한 복잡한 화학적 커뮤니케이션 네트워크를 통해 식물은 집단 방어를 조율하고 외부 보디가드 종을 모집하여 생존을 확보한다.
+
+[요약문] 해충의 공격을 받은 식물은 공기 중 화학 물질을 방출하여 이웃 식물들이 방어를 활성화하도록 (A) 경고하고(warn), 동시에 위협을 제거하기 위해 천적을 (B) 유인한다(attract).`,
+    options: [
+      "① warn …… attract",
+      "② mislead …… repel",
+      "③ stimulate …… ignore",
+      "④ shield …… expose",
+      "⑤ warn …… disperse"
+    ],
+    answerIndex: 0,
+    explanation: "(A) 공격을 받은 식물은 이웃 식물들에게 해충의 존재를 알려 방어 독소를 미리 만들도록 '경고(warn)'합니다.\n(B) 동시에 공격하는 곤충의 천적(기생 벌 등)을 '유인(attract)'하여 해충을 제거하게 하므로 ①번이 정답입니다.",
+    syntaxNotes: [
+      "First, they alert neighboring plants ..., [prompting them to preemptively produce defensive toxins...]. (prompting은 분사구문이며 prompt + O + to V 구조를 취합니다.)",
+      "Second, VOCs act as chemical distress calls [that attract natural predators of the attacking insects...]. (주격 관계대명사절이 distress calls를 수식합니다.)"
+    ],
+    vocabList: [
+      { word: "herbivorous", meaning: "초식성의" },
+      { word: "volatile organic compounds (VOCs)", meaning: "휘발성 유기화합물" },
+      { word: "preemptively", meaning: "선제적으로" },
+      { word: "distress call", meaning: "구조 요청 신호" },
+      { word: "intricate", meaning: "복잡한, 얽힌" }
+    ]
+  },
+  {
+    id: "26053-0210",
+    lesson: "실전 3회",
+    itemNo: "41-42번",
+    type: "장문 독해",
+    title: "실패에 대한 두려움 극복과 혁신을 위한 성장 마인드셋",
+    passage: `In modern corporate and educational environments, failure is often treated as something to be avoided at all costs. Traditional evaluation systems reward error-free performance and penalize mistakes, creating a culture dominated by risk aversion. However, this obsessive focus on perfection severely restricts innovation. When individuals are terrified of making mistakes, they naturally gravitate toward safe, familiar solutions rather than experimenting with novel ideas.
+
+Psychologist Carol Dweck's research on mindsets highlights the contrast between a fixed mindset and a growth mindset. Individuals with a fixed mindset view intelligence and ability as static traits. For them, failure is a humiliating proof of inadequacy. Consequently, they avoid challenges that might jeopardize their reputation. In contrast, those with a growth mindset view setbacks as valuable learning opportunities essential for mastery. Leading tech companies now cultivate "fail-safe" cultures where thoughtful risk-taking is celebrated. By treating failure as (e) <u class="font-semibold underline decoration-rose-500">useless</u> [-> informative / valuable] feedback rather than a final judgment, organizations unlock employee creativity and maintain long-term competitiveness.`,
+    translation: `현대의 기업 및 교육 환경에서 실패는 흔히 무슨 수를 써서라도 피해야 할 것으로 취급된다. 전통적인 평가 시스템은 오류 없는 성과에 보상하고 실수를 처벌하여 위험 회피가 지배하는 문화를 조성한다. 그러나 완벽주의에 대한 이러한 집착은 혁신을 심각하게 제한한다. 개인들이 실수하는 것을 극도로 두려워할 때, 그들은 참신한 아이디어를 실험하기보다 자연스럽게 안전하고 익숙한 해결책으로 끌리게 된다.
+
+심리학자 Carol Dweck의 마인드셋 연구는 고정 마인드셋과 성장 마인드셋 간의 대조를 부각한다. 고정 마인드셋을 가진 개인들은 지능과 능력을 정적인 특성으로 본다. 그들에게 실패는 불충분함을 보여주는 굴욕적인 증거다. 결과적으로 그들은 자신의 평판을 위협할 수 있는 도전을 피한다. 반면에 성장 마인드셋을 가진 이들은 숙달에 필수적인 가치 있는 배움의 기회로 실패를 바라본다. 선도적인 기술 기업들은 이제 사려 깊은 위험 감수가 찬사 받는 문화('실패를 허용하는' 문화)를 가꾼다. 실패를 최종적 심판이 아닌 (e) 유용한/가치 있는(informative/valuable) 피드백으로 취급함으로써, 조직은 직원들의 창의성을 해방하고 장기적 경쟁력을 유지한다.`,
+    options: [
+      "41번 제목: ① Reframing Failure: The Catalyst for Innovation and Growth",
+      "42번 어휘: ⑤ (e) useless -> informative / valuable"
+    ],
+    answerIndex: 1,
+    explanation: "41번: 실패를 두려워할 대상이 아니라 가치 있는 피드백이자 성장의 촉매제로 재정의하는 것이 혁신의 열쇠라는 내용이므로 ① 'Reframing Failure: The Catalyst for Innovation and Growth'가 정답입니다.\n42번: 글의 마지막 문장은 실패를 가치 있고 유익한 피드백으로 바라보아야 조직의 창의성이 촉진된다는 맥락이므로 (e)의 useless(무용한)는 맥락상 어색하며 informative 또는 valuable 등으로 바뀌어야 합니다.",
+    syntaxNotes: [
+      "...creating a culture [dominated by risk aversion]. (과거분사구 dominated가 culture를 후위수식합니다.)",
+      "By treating failure as informative feedback ..., organizations unlock employee creativity... (By + -ing 구문으로 '~함으로써'라는 수단을 나타냅니다.)"
+    ],
+    vocabList: [
+      { word: "risk aversion", meaning: "위험 회피" },
+      { word: "gravitate toward", meaning: "~로 끌리다, 경향을 보이다" },
+      { word: "fixed mindset", meaning: "고정 마인드셋" },
+      { word: "growth mindset", meaning: "성장 마인드셋" },
+      { word: "jeopardize", meaning: "위험에 빠뜨리다" },
+      { word: "informative", meaning: "유익한, 정보를 주는" }
+    ]
+  },
+  {
+    id: "26053-0212",
+    lesson: "실전 3회",
+    itemNo: "43-45번",
+    type: "장문 독해",
+    title: "바이올린 제작자 Matteo와 제자 Leo의 섬세한 목재 조각과 장인정신",
+    passage: `(A) Matteo was a master violin maker in Cremona, Italy, renowned for crafting instruments with exceptional acoustic warmth. His young apprentice, Leo, had spent two years learning the fundamentals of wood selection and tool maintenance. One morning, Matteo handed Leo a piece of aged spruce wood for the front plate of a new violin. "Today, Leo, you will carve the delicate arching curves," Matteo said. (a) He watched closely as Leo picked up the gouge tool.
+
+(C) Leo began carving with great enthusiasm, eager to demonstrate his skill. However, in his haste to finish the top plate, his hand slipped, cutting slightly too deep into the center of the wood. Leo gasped, realizing (c) he had ruined the piece. Frustrated and ashamed, he bowed his head, expecting a harsh reprimand from his master.
+
+(D) Matteo walked over, picked up the marked wood, and examined the deep groove. Instead of scolding the boy, (d) he smiled gently. "Wood has its own memory and grain, Leo. A master craftsman does not throw away a mistake; he adapts his design to work with the wood's natural character." Matteo guided Leo's hands, showing him how to adjust the surrounding thickness to balance the acoustic resonance.
+
+(B) Working together through the afternoon, they transformed the altered wood into a soundboard with a uniquely rich tone. Months later, when a famous soloist played the finished violin, its sound was hailed as extraordinarily sweet and warm. Leo looked at Matteo with tears of gratitude. "(b) You taught me that perfection comes not from never making mistakes, but from learning how to restore harmony," Leo whispered. Matteo beamed with pride at his apprentice's growth.`,
+    translation: `(A) Matteo는 이탈리아 크레모나의 거장 바이올린 제작자로, 뛰어난 음향적 따뜻함을 지닌 악기를 제작하는 것으로 유명했다. 그의 어린 도제 Leo는 목재 선택과 도구 관리의 기초를 배우며 2년을 보냈다. 어느 날 아침, Matteo는 새 바이올린의 전면 판에 쓸 오랫동안 건조된 가문비나무 조각을 Leo에게 건넸다. "오늘 Leo, 너는 섬세한 아치형 곡선을 조각할 거란다." Matteo가 말했다. (a) 그는 Leo가 끌 도구를 집어 들 때 유심히 지켜보았다.
+
+(C) Leo는 자신의 실력을 보여주고 싶은 마음에 열정적으로 조각하기 시작했다. 그러나 상판을 서둘러 마무리지으려다 그의 손이 미끄러져 목재 중앙을 너무 깊게 깎아 버렸다. Leo는 (c) 자신이 목재를 망쳤다는 것을 깨닫고 헉 하고 숨을 내쉬었다. 자책감과 부끄러움에 그는 스승의 혹독한 책망을 예상하며 고개를 숙였다.
+
+(D) Matteo가 걸어와 흠집이 난 목재를 집어 들고 깊은 홈을 살펴보았다. 아이를 혼내는 대신, (d) 그는 다정하게 미소를 지었다. "나무에는 고유한 기억과 결이 있단다, Leo. 거장 장인은 실수를 버리지 않는다. 나무의 자연스러운 특성에 맞추어 디자인을 조정하는 법이지." Matteo는 Leo의 손을 이끌어, 음향적 울림의 균형을 맞추기 위해 주변 두께를 조절하는 방법을 보여주었다.
+
+(B) 오후 내내 함께 작업하면서, 그들은 변형된 목재를 독특하고 풍부한 음색을 지닌 울림판으로 바꾸어 놓았다. 수개월 후 유명한 독주자가 완성된 바이올린을 연주했을 때, 그 소리는 엄청나게 감미롭고 따뜻하다고 찬사를 받았다. Leo는 감사의 눈물을 흘리며 Matteo를 바라보았다. "(b) 스승님은 완벽함이란 결코 실수를 하지 않는 데서 오는 것이 아니라, 어떻게 조화를 회복하는지 배우는 데서 온다는 것을 가르쳐 주셨어요." Leo가 속삭였다. Matteo는 제자의 성장에 자랑스러운 미소를 지었다.`,
+    options: [
+      "43번 글의 순서: ③ (C) - (D) - (B)",
+      "44번 지칭 추론: ④ (d)는 스승 Matteo, 나머지는 (a,b,c) 제자 Leo",
+      "45번 내용 불일치: ⑤ Leo는 실수를 한 후 스승에게 야단을 맞고 목재를 버렸다. (X -> 야단맞지 않고 디자인을 수정함)"
+    ],
+    answerIndex: 0,
+    explanation: "43번: 목재 조각 과제를 부여받는 (A) -> 서두르다 목재에 흠집을 내어 실의에 빠지는 (C) -> 스승 Matteo가 다가와 목재의 결을 살려 디자인을 조절하도록 지도하는 (D) -> 완성된 바이올린이 훌륭한 소리를 내고 제자가 조화의 교훈을 깨닫는 (B)로 연결되므로 ③ (C) - (D) - (B) 가 정답입니다.\n44번: (a), (b), (c)는 제자 Leo를 지칭하지만, (d)는 스승 Matteo를 지칭하므로 ④번이 정답입니다.\n45번: Matteo는 제자 Leo를 혼내지 않고 목재의 결을 활용하도록 가르쳤으므로 ⑤번 설명은 내용과 일치하지 않습니다.",
+    syntaxNotes: [
+      "...renowned for crafting instruments [with exceptional acoustic warmth]. (renowned for ~는 '~로 유명한'을 뜻하는 형용사구입니다.)",
+      "Instead of scolding the boy, he smiled gently. (Instead of + -ing 구문입니다.)"
+    ],
+    vocabList: [
+      { word: "apprentice", meaning: "도제, 견습생" },
+      { word: "spruce wood", meaning: "가문비나무 목재" },
+      { word: "gouge", meaning: "홈을 파는 끌" },
+      { word: "reprimand", meaning: "비난, 책망" },
+      { word: "resonance", meaning: "울림, 공명" }
+    ]
+  },
 
   // ================= [ 실전모의고사 4회(1) ] =================
   {
