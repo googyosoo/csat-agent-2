@@ -264,14 +264,10 @@ ${explanation || ''}
 Syntax Notes:
 ${Array.isArray(syntaxNotes) ? syntaxNotes.join('\n') : ''}`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: userPrompt,
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: 'application/json',
-        responseSchema: analyzeResponseSchema,
-      },
+    const response = await callGemini(ai, userPrompt, {
+      systemInstruction: systemPrompt,
+      responseMimeType: 'application/json',
+      responseSchema: analyzeResponseSchema,
     });
 
     const responseText = response.text;
@@ -1016,14 +1012,10 @@ app.post('/api/gemini/ingest', async (req, res) => {
 
     const systemPrompt = `You are an expert EBS English curriculum processor. Analyze the raw English passage provided by the user and extract metadata in JSON format matching the schema.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: `Passage:\n${passageText}`,
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: 'application/json',
-        responseSchema: ingestResponseSchema,
-      },
+    const response = await callGemini(ai, `Passage:\n${passageText}`, {
+      systemInstruction: systemPrompt,
+      responseMimeType: 'application/json',
+      responseSchema: ingestResponseSchema,
     });
 
     const responseText = response.text;
@@ -1144,13 +1136,9 @@ JSON schema:
   "vocabList": [{"word": "englishWord", "meaning": "koreanMeaning"}]
 }`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: `Passage:\n${passageText}`,
-      config: {
-        systemInstruction: systemPrompt,
-        responseMimeType: 'application/json',
-      },
+    const response = await callGemini(ai, `Passage:\n${passageText}`, {
+      systemInstruction: systemPrompt,
+      responseMimeType: 'application/json',
     });
 
     const responseText = response.text;
@@ -1260,14 +1248,10 @@ Respond ONLY with JSON matching the required schema.`;
 
   try {
     const ai = getGenAIClient(customApiKey);
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: studentReportSchema,
-        temperature: 0.3,
-      },
+    const response = await callGemini(ai, [{ role: 'user', parts: [{ text: prompt }] }], {
+      responseMimeType: 'application/json',
+      responseSchema: studentReportSchema,
+      temperature: 0.3,
     });
 
     const responseText = response.text;
