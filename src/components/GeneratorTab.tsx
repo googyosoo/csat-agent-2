@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { EBSPassage, GeneratedItem } from '../types';
 import { safeFetchJson } from '../lib/api';
 import { recordGeneratorUsage } from '../lib/analytics';
 import { auth } from '../lib/firebase';
 
 interface GeneratorTabProps {
-  selectedPassage: EBSPassage;
+  selectedPassage?: EBSPassage | null;
   customApiKey: string;
 }
 
@@ -35,6 +35,11 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
   }, [isGenerating]);
 
   const generateQuestion = async () => {
+    if (!selectedPassage || !selectedPassage.passage) {
+      setError('변형 문제를 생성할 지문이 선택되지 않았습니다.');
+      return;
+    }
+
     setIsGenerating(true);
     setGeneratedItem(null);
     setUserChoice(null);
@@ -47,8 +52,8 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           passage: selectedPassage.passage,
-          lesson: selectedPassage.lesson,
-          itemNo: selectedPassage.itemNo,
+          lesson: selectedPassage.lesson || '미지정',
+          itemNo: selectedPassage.itemNo || '미지정',
           targetQuestionType: targetType,
           difficulty,
           customApiKey,
@@ -72,6 +77,16 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
     return rawOpt.replace(/<[^>]*>/g, '');
   };
 
+  if (!selectedPassage) {
+    return (
+      <div className="max-w-5xl mx-auto py-12 text-center text-slate-400 bg-slate-900 rounded-2xl border border-slate-800">
+        <i className="fa-solid fa-file-circle-exclamation text-4xl mb-3 text-amber-400"></i>
+        <h3 className="text-base font-bold text-white mb-1">선택된 지문이 없습니다</h3>
+        <p className="text-xs text-slate-400">좌측 지문 분석 워크북 목록에서 변형문제를 생성할 EBS 지문을 먼저 선택해 주세요.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12">
       <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl">
@@ -82,7 +97,7 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
               <span>Gemini 수능 변형문항 전문 생성기</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              [{selectedPassage.lesson} {selectedPassage.itemNo}] 지문의 논리적 특성에 맞춘 유형별 고품질 수능 문제 정밀 생성
+              [{selectedPassage.lesson || ''} {selectedPassage.itemNo || ''}] 지문의 논리적 특성에 맞춘 유형별 고품질 수능 문제 정밀 생성
             </p>
           </div>
 
