@@ -20,8 +20,8 @@ function cleanJsonString(str) {
 var VALID_TYPES = ["\uBE48\uCE78 \uCD94\uB860", "\uC5B4\uBC95 \uD310\uB2E8", "\uBB38\uC7A5 \uC0BD\uC785", "\uC5B4\uD718 \uC801\uC808\uC131", "\uC8FC\uC81C \uBC0F \uC81C\uBAA9", "\uC694\uC57D\uBB38 \uC644\uC131"];
 function validatePassageInput(body, options = {}) {
   const { checkPassage = true, checkType = false } = options;
-  if (!body || typeof body !== "object") {
-    return "\uC694\uCCAD \uBCF8\uBB38\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.";
+  if (!body || typeof body !== "object" || Object.keys(body).length === 0) {
+    return "\uC9C0\uBB38\uC774 \uBE44\uC5B4 \uC788\uAC70\uB098 \uC694\uCCAD \uBCF8\uBB38\uC774 \uC720\uD6A8\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. (\uCD5C\uC18C 50\uC790)";
   }
   if (checkPassage) {
     if (!body.passage || typeof body.passage !== "string" || body.passage.trim().length < 50) {

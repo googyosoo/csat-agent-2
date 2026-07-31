@@ -27,8 +27,8 @@ const VALID_TYPES = ['빈칸 추론', '어법 판단', '문장 삽입', '어휘 
 function validatePassageInput(body: any, options: { checkPassage?: boolean; checkType?: boolean } = {}) {
   const { checkPassage = true, checkType = false } = options;
 
-  if (!body || typeof body !== 'object') {
-    return '요청 본문이 올바르지 않습니다.';
+  if (!body || typeof body !== 'object' || Object.keys(body).length === 0) {
+    return '지문이 비어 있거나 요청 본문이 유효하지 않습니다. (최소 50자)';
   }
 
   if (checkPassage) {
