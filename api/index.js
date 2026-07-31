@@ -1,45 +1,12 @@
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-
 // server.ts
-var server_exports = {};
-__export(server_exports, {
-  default: () => server_default
-});
-module.exports = __toCommonJS(server_exports);
-var import_express = __toESM(require("express"), 1);
-var import_path = __toESM(require("path"), 1);
-var import_dotenv = __toESM(require("dotenv"), 1);
-var import_genai = require("@google/genai");
-import_dotenv.default.config();
-var app = (0, import_express.default)();
+import express from "express";
+import path from "path";
+import dotenv from "dotenv";
+import { GoogleGenAI, Type } from "@google/genai";
+dotenv.config();
+var app = express();
 var PORT = 3e3;
-app.use(import_express.default.json({ limit: "10mb" }));
+app.use(express.json({ limit: "10mb" }));
 function cleanJsonString(str) {
   if (!str) return "";
   let cleaned = str.trim();
@@ -55,7 +22,7 @@ function getGenAIClient(customApiKey) {
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY \uD658\uACBD\uBCC0\uC218\uAC00 \uC124\uC815\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4. Vercel Settings -> Environment Variables \uB610\uB294 \uC571 \uC0C1\uB2E8\uC5D0\uC11C API Key\uB97C \uC785\uB825\uD574 \uC8FC\uC138\uC694.");
   }
-  return new import_genai.GoogleGenAI({
+  return new GoogleGenAI({
     apiKey,
     httpOptions: {
       headers: {
@@ -146,16 +113,16 @@ function buildPassageSpecificFallback(body) {
   };
 }
 var analyzeResponseSchema = {
-  type: import_genai.Type.OBJECT,
+  type: Type.OBJECT,
   properties: {
-    coreTheme: { type: import_genai.Type.STRING },
+    coreTheme: { type: Type.STRING },
     logicalFlow: {
-      type: import_genai.Type.ARRAY,
-      items: { type: import_genai.Type.STRING }
+      type: Type.ARRAY,
+      items: { type: Type.STRING }
     },
-    keyGrammar: { type: import_genai.Type.STRING },
-    examinerInsight: { type: import_genai.Type.STRING },
-    socraticHint: { type: import_genai.Type.STRING }
+    keyGrammar: { type: Type.STRING },
+    examinerInsight: { type: Type.STRING },
+    socraticHint: { type: Type.STRING }
   },
   required: ["coreTheme", "logicalFlow", "keyGrammar", "examinerInsight", "socraticHint"]
 };
@@ -887,28 +854,28 @@ Include clear logical flow nodes, main educational metaphor elements, clean typo
   });
 });
 var ingestResponseSchema = {
-  type: import_genai.Type.OBJECT,
+  type: Type.OBJECT,
   properties: {
-    title: { type: import_genai.Type.STRING },
-    type: { type: import_genai.Type.STRING },
-    translation: { type: import_genai.Type.STRING },
+    title: { type: Type.STRING },
+    type: { type: Type.STRING },
+    translation: { type: Type.STRING },
     options: {
-      type: import_genai.Type.ARRAY,
-      items: { type: import_genai.Type.STRING }
+      type: Type.ARRAY,
+      items: { type: Type.STRING }
     },
-    answerIndex: { type: import_genai.Type.NUMBER },
-    explanation: { type: import_genai.Type.STRING },
+    answerIndex: { type: Type.NUMBER },
+    explanation: { type: Type.STRING },
     syntaxNotes: {
-      type: import_genai.Type.ARRAY,
-      items: { type: import_genai.Type.STRING }
+      type: Type.ARRAY,
+      items: { type: Type.STRING }
     },
     vocabList: {
-      type: import_genai.Type.ARRAY,
+      type: Type.ARRAY,
       items: {
-        type: import_genai.Type.OBJECT,
+        type: Type.OBJECT,
         properties: {
-          word: { type: import_genai.Type.STRING },
-          meaning: { type: import_genai.Type.STRING }
+          word: { type: Type.STRING },
+          meaning: { type: Type.STRING }
         },
         required: ["word", "meaning"]
       }
@@ -1079,14 +1046,14 @@ app.use((err, req, res, next) => {
   next(err);
 });
 var studentReportSchema = {
-  type: import_genai.Type.OBJECT,
+  type: Type.OBJECT,
   properties: {
-    studentEmail: { type: import_genai.Type.STRING },
-    studentName: { type: import_genai.Type.STRING },
-    personalizedFeedback: { type: import_genai.Type.STRING },
-    schoolRecordSetek: { type: import_genai.Type.STRING },
-    byteCount: { type: import_genai.Type.NUMBER },
-    keyCompetencies: { type: import_genai.Type.ARRAY, items: { type: import_genai.Type.STRING } }
+    studentEmail: { type: Type.STRING },
+    studentName: { type: Type.STRING },
+    personalizedFeedback: { type: Type.STRING },
+    schoolRecordSetek: { type: Type.STRING },
+    byteCount: { type: Type.NUMBER },
+    keyCompetencies: { type: Type.ARRAY, items: { type: Type.STRING } }
   },
   required: ["studentEmail", "studentName", "personalizedFeedback", "schoolRecordSetek", "byteCount", "keyCompetencies"]
 };
@@ -1158,10 +1125,10 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = import_path.default.join(process.cwd(), "dist");
-    app.use(import_express.default.static(distPath));
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(import_path.default.join(distPath, "index.html"));
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
   app.listen(PORT, "0.0.0.0", () => {
@@ -1172,3 +1139,6 @@ if (!process.env.VERCEL) {
   startServer();
 }
 var server_default = app;
+export {
+  server_default as default
+};
