@@ -28,7 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
     try {
       await signInWithGoogle();
     } catch (err: any) {
-      alert(err.message || 'Google 로그인에 실패했습니다.');
+      console.error(err.message || 'Google 로그인에 실패했습니다.');
     } finally {
       setIsLoggingIn(false);
     }
@@ -38,7 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
     try {
       await logout();
     } catch (err: any) {
-      alert(err.message || '로그아웃 실패');
+      console.error(err.message || '로그아웃 실패');
     }
   };
 

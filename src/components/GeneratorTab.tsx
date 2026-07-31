@@ -18,11 +18,28 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showOriginalPassage, setShowOriginalPassage] = useState(true);
 
+  const [error, setError] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+
+  useEffect(() => {
+    let timer: any;
+    if (isGenerating) {
+      setElapsedSeconds(0);
+      timer = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => clearInterval(timer);
+  }, [isGenerating]);
+
   const generateQuestion = async () => {
     setIsGenerating(true);
     setGeneratedItem(null);
     setUserChoice(null);
     setShowAnalysis(false);
+    setError(null);
 
     try {
       const data = await safeFetchJson('/api/gemini/transform', {
@@ -45,7 +62,7 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
         throw new Error(data.error || '변형 문항 생성 실패');
       }
     } catch (err: any) {
-      alert(`변형 문제 생성 오류: ${err.message}`);
+      setError(`변형 문제 생성 오류: ${err.message}`);
     } finally {
       setIsGenerating(false);
     }
@@ -111,6 +128,31 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
             </button>
           </div>
         </div>
+
+        {error && (
+          <div className="p-4 bg-rose-500/10 border border-rose-500/30 text-rose-300 rounded-xl text-xs flex items-center space-x-2 my-4">
+            <i className="fa-solid fa-triangle-exclamation"></i>
+            <span>{error}</span>
+          </div>
+        )}
+
+        {isGenerating && (
+          <div className="bg-slate-950 p-6 rounded-xl border border-amber-500/40 text-center space-y-3 my-4">
+            <div className="flex items-center justify-center space-x-2 text-amber-400 font-bold text-sm">
+              <i className="fa-solid fa-wand-magic-sparkles animate-spin"></i>
+              <span>변형 문항 생성 중... ({elapsedSeconds}초 경과 / 최대 30초 소요)</span>
+            </div>
+            <p className="text-xs text-slate-400">
+              Gemini가 수능 출제 기준에 맞추어 빈칸 위치, 어법 오류 및 해설 논리를 검토하고 있습니다.
+            </p>
+            <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+              <div
+                className="bg-gradient-to-r from-amber-500 to-purple-500 h-full transition-all duration-300 ease-out"
+                style={{ width: `${Math.min(100, (elapsedSeconds / 25) * 100)}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
 
         {generatedItem ? (
           <div className="bg-slate-950 p-6 rounded-xl border border-amber-500/30 space-y-5 shadow-2xl">

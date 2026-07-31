@@ -17,6 +17,24 @@ function cleanJsonString(str) {
   }
   return cleaned.trim();
 }
+var VALID_TYPES = ["\uBE48\uCE78 \uCD94\uB860", "\uC5B4\uBC95 \uD310\uB2E8", "\uBB38\uC7A5 \uC0BD\uC785", "\uC5B4\uD718 \uC801\uC808\uC131", "\uC8FC\uC81C \uBC0F \uC81C\uBAA9", "\uC694\uC57D\uBB38 \uC644\uC131"];
+function validatePassageInput(body, options = {}) {
+  const { checkPassage = true, checkType = false } = options;
+  if (!body || typeof body !== "object") {
+    return "\uC694\uCCAD \uBCF8\uBB38\uC774 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.";
+  }
+  if (checkPassage) {
+    if (!body.passage || typeof body.passage !== "string" || body.passage.trim().length < 50) {
+      return "\uC9C0\uBB38\uC774 \uBE44\uC5B4 \uC788\uAC70\uB098 \uB108\uBB34 \uC9E7\uC2B5\uB2C8\uB2E4. (\uCD5C\uC18C 50\uC790)";
+    }
+  }
+  if (checkType && body.targetQuestionType) {
+    if (!VALID_TYPES.includes(body.targetQuestionType)) {
+      return `\uC9C0\uC6D0\uD558\uC9C0 \uC54A\uB294 \uCD9C\uC81C \uC720\uD615\uC785\uB2C8\uB2E4: ${body.targetQuestionType}`;
+    }
+  }
+  return null;
+}
 function getGenAIClient(customApiKey) {
   const apiKey = customApiKey && typeof customApiKey === "string" && customApiKey.trim().length > 0 ? customApiKey.trim() : process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -127,6 +145,8 @@ var analyzeResponseSchema = {
   required: ["coreTheme", "logicalFlow", "keyGrammar", "examinerInsight", "socraticHint"]
 };
 app.post("/api/gemini/analyze", async (req, res) => {
+  const invalid = validatePassageInput(req.body);
+  if (invalid) return res.status(400).json({ success: false, error: invalid });
   const { passage, lesson, itemNo, title, type, translation, explanation, syntaxNotes, vocabList, customApiKey } = req.body;
   try {
     const ai = getGenAIClient(customApiKey);
@@ -492,7 +512,44 @@ Therefore, [___________].`,
     ]
   };
 }
+var transformResponseSchema = {
+  type: Type.OBJECT,
+  properties: {
+    type: { type: Type.STRING },
+    difficulty: { type: Type.STRING },
+    question: { type: Type.STRING },
+    modifiedPassage: { type: Type.STRING },
+    options: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING }
+    },
+    correctIndex: { type: Type.INTEGER },
+    rationale: { type: Type.STRING },
+    distractorAnalysis: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          optionIndex: { type: Type.INTEGER },
+          isCorrect: { type: Type.BOOLEAN },
+          reason: { type: Type.STRING }
+        }
+      }
+    },
+    vocabularyHighlights: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING }
+    },
+    syntaxHighlights: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING }
+    }
+  },
+  required: ["type", "difficulty", "question", "modifiedPassage", "options", "correctIndex", "rationale"]
+};
 app.post("/api/gemini/transform", async (req, res) => {
+  const invalid = validatePassageInput(req.body, { checkPassage: true, checkType: true });
+  if (invalid) return res.status(400).json({ success: false, error: invalid });
   const { passage, lesson, itemNo, targetQuestionType = "\uBE48\uCE78 \uCD94\uB860", difficulty = "\uC218\uB2A5 \uD45C\uC900", customApiKey } = req.body;
   try {
     const ai = getGenAIClient(customApiKey);
@@ -542,25 +599,7 @@ CRITICAL QUESTION TYPE FORMATTING RULES:
 <Summary sentence with (A) [___________] and (B) [___________]>".
    - options: ["\u2460 (A) ...  ---  (B) ...", "\u2461 (A) ...  ---  (B) ...", "\u2462 (A) ...  ---  (B) ...", "\u2463 (A) ...  ---  (B) ...", "\u2464 (A) ...  ---  (B) ..."].
 
-Return JSON ONLY matching the following schema:
-{
-  "type": "${targetQuestionType}",
-  "difficulty": "${difficulty}",
-  "question": "string (Korean question instruction following rules above)",
-  "modifiedPassage": "string (Passage with formatting according to rules above)",
-  "options": ["string", "string", "string", "string", "string"],
-  "correctIndex": number (0 to 4),
-  "rationale": "string (Detailed Korean rationale explaining why the correct choice is right)",
-  "distractorAnalysis": [
-    { "optionIndex": 0, "isCorrect": boolean, "reason": "Korean explanation for option 1" },
-    { "optionIndex": 1, "isCorrect": boolean, "reason": "Korean explanation for option 2" },
-    { "optionIndex": 2, "isCorrect": boolean, "reason": "Korean explanation for option 3" },
-    { "optionIndex": 3, "isCorrect": boolean, "reason": "Korean explanation for option 4" },
-    { "optionIndex": 4, "isCorrect": boolean, "reason": "Korean explanation for option 5" }
-  ],
-  "vocabularyHighlights": ["word1 - meaning1", "word2 - meaning2"],
-  "syntaxHighlights": ["syntax point 1", "syntax point 2"]
-}`;
+Return JSON ONLY matching the required schema.`;
     const userPrompt = `Original Passage (${lesson || ""} ${itemNo || ""}):
 ${passage}
 
@@ -568,7 +607,8 @@ Target Question Type: ${targetQuestionType}
 Difficulty Level: ${difficulty}`;
     const response = await callGemini(ai, userPrompt, {
       systemInstruction: systemPrompt,
-      responseMimeType: "application/json"
+      responseMimeType: "application/json",
+      responseSchema: transformResponseSchema
     });
     const responseText = response.text;
     if (!responseText) throw new Error("Empty response from Gemini model");
@@ -729,6 +769,8 @@ function buildPassageVisualSvg(body) {
   return Buffer.from(svg).toString("base64");
 }
 app.post("/api/gemini/socratic", async (req, res) => {
+  const invalid = validatePassageInput(req.body);
+  if (invalid) return res.status(400).json({ success: false, error: invalid });
   const { history, passage, title, lesson, itemNo, translation, customApiKey, hintLevel } = req.body;
   try {
     const ai = getGenAIClient(customApiKey);
@@ -977,7 +1019,11 @@ Include clear logical flow nodes, main educational metaphor elements, clean typo
   });
 });
 app.post("/api/gemini/ingest", async (req, res) => {
-  const { passageText, lesson, itemNo, customApiKey } = req.body;
+  const body = req.body || {};
+  const passageText = body.passageText || body.passage;
+  const invalid = validatePassageInput({ ...body, passage: passageText });
+  if (invalid) return res.status(400).json({ success: false, error: invalid });
+  const { lesson, itemNo, customApiKey } = body;
   try {
     const ai = getGenAIClient(customApiKey);
     const systemPrompt = `You are an expert EBS English curriculum processor. Analyze the raw English passage provided by the user and extract metadata in JSON format.
@@ -1029,22 +1075,6 @@ ${passageText}`, {
     res.json({ success: true, data: fallbackData, fallback: true });
   }
 });
-app.use("/api/*", (req, res) => {
-  res.status(404).json({
-    success: false,
-    error: `\uC694\uCCAD\uD558\uC2E0 API \uC5D4\uB4DC\uD3EC\uC778\uD2B8(${req.originalUrl})\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`
-  });
-});
-app.use((err, req, res, next) => {
-  console.error("Global Express Error:", err);
-  if (req.originalUrl && req.originalUrl.startsWith("/api")) {
-    return res.status(200).json({
-      success: false,
-      error: err?.message || "\uC11C\uBC84 \uB0B4\uBD80 \uCC98\uB9AC \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4."
-    });
-  }
-  next(err);
-});
 var studentReportSchema = {
   type: Type.OBJECT,
   properties: {
@@ -1068,9 +1098,12 @@ function getKoreanByteLength(str) {
   return b;
 }
 app.post("/api/gemini/student-report", async (req, res) => {
-  const { student, socraticLogs = [], customApiKey } = req.body;
-  const studentEmail = student?.email || "student@simin.hs.kr";
-  const studentName = student?.name || "\uAE40\uD559\uC0DD";
+  const body = req.body || {};
+  const student = body.student || {};
+  const studentEmail = body.studentEmail || student.email || "student@simin.hs.kr";
+  const studentName = body.studentName || student.name || "\uAE40\uD559\uC0DD";
+  const records = body.records || body.socraticLogs || [];
+  const customApiKey = body.customApiKey;
   const prompt = `You are a master High School English Teacher in Korea preparing official School Student Records (\uD559\uAD50\uC0DD\uD65C\uAE30\uB85D\uBD80 \uC138\uBD80\uB2A5\uB825 \uBC0F \uD2B9\uAE30\uC0AC\uD56D).
 Analyze the following student's learning data and generate a personalized learning feedback report AND an official NEIS School Record Setek (\uC138\uD2B9) text.
 
@@ -1078,10 +1111,7 @@ Analyze the following student's learning data and generate a personalized learni
 - Name: ${studentName} (${studentEmail})
 - Total Logins: ${student?.loginCount || 1} times
 - Total Study Dwell Time: ${student?.totalDwellTimeMinutes || 25} minutes
-- Passages Analyzed: ${student?.completedPassagesCount || 3} passages
-- Transformed Questions Generated: ${student?.transformedQuestionsGenerated || 2} questions
-- Socratic Questions Asked: ${student?.socraticQuestionsCount || 2} questions
-- Socratic Logs & Q&A Snippets: ${JSON.stringify(socraticLogs.slice(0, 5))}
+- Learning Records: ${JSON.stringify(records.slice(0, 5))}
 
 [Instruction Rules for Setek (\uC138\uBD80\uB2A5\uB825 \uBC0F \uD2B9\uAE30\uC0AC\uD56D)]:
 1. TONE & STYLE: Write in official, formal Korean teacher observation style (~\uD568., ~\uC5D0\uC11C \uB450\uAC01\uC744 \uB098\uD0C0\uB0C4., ~\uC744 \uC790\uC728 \uD0D0\uAD6C\uD568.).
@@ -1100,7 +1130,12 @@ Respond ONLY with JSON matching the required schema.`;
     const responseText = response.text;
     if (!responseText) throw new Error("Empty response from Gemini");
     const resultJson = JSON.parse(cleanJsonString(responseText));
+    resultJson.studentEmail = studentEmail;
+    resultJson.studentName = studentName;
     resultJson.byteCount = getKoreanByteLength(resultJson.schoolRecordSetek || "");
+    if (!Array.isArray(resultJson.keyCompetencies)) {
+      resultJson.keyCompetencies = ["\uC8FC\uB3C4\uC801 \uBA54\uD0C0\uC778\uC9C0 \uD0D0\uAD6C", "\uB17C\uB9AC\uC801 \uC9C0\uBB38 \uAD6C\uC870 \uBD84\uC11D", "\uC218\uB2A5 \uBCC0\uD615 \uBB38\uC81C \uC751\uC6A9\uB825"];
+    }
     res.json({ success: true, data: resultJson });
   } catch (error) {
     console.info("[Student Report API] Generating intelligent fallback report.");
@@ -1115,6 +1150,22 @@ Respond ONLY with JSON matching the required schema.`;
     };
     res.json({ success: true, data: fallbackReport, fallback: true });
   }
+});
+app.use("/api/*", (req, res) => {
+  res.status(404).json({
+    success: false,
+    error: `\uC694\uCCAD\uD558\uC2E0 API \uC5D4\uB4DC\uD3EC\uC778\uD2B8(${req.originalUrl})\uB97C \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.`
+  });
+});
+app.use((err, req, res, next) => {
+  console.error("Global Express Error:", err);
+  if (req.originalUrl && req.originalUrl.startsWith("/api")) {
+    return res.status(200).json({
+      success: false,
+      error: err?.message || "\uC11C\uBC84 \uB0B4\uBD80 \uCC98\uB9AC \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4."
+    });
+  }
+  next(err);
 });
 async function startServer() {
   if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {

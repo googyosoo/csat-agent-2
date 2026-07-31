@@ -14,9 +14,12 @@ export const IngestModal: React.FC<IngestModalProps> = ({ onClose, onAddPassage,
   const [passageText, setPassageText] = useState('');
   const [isIngesting, setIsIngesting] = useState(false);
 
+  const [statusMsg, setStatusMsg] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+
   const handleIngest = async () => {
-    if (!passageText.trim() || isIngesting) return;
+    if (!passageText.trim()) return;
     setIsIngesting(true);
+    setStatusMsg(null);
 
     try {
       const resData = await safeFetchJson('/api/gemini/ingest', {
@@ -40,13 +43,13 @@ export const IngestModal: React.FC<IngestModalProps> = ({ onClose, onAddPassage,
         };
 
         onAddPassage(newItem);
-        alert(`새 지문 [${lesson} ${itemNo}] 분석 및 탑재가 완료되었습니다!`);
-        onClose();
+        setStatusMsg({ type: 'success', text: `새 지문 [${lesson} ${itemNo}] 분석 및 탑재가 완료되었습니다!` });
+        setTimeout(() => onClose(), 1200);
       } else {
         throw new Error(resData.error || '지문 자동 파싱 실패');
       }
     } catch (err: any) {
-      alert(`지문 자동 등록 오류: ${err.message}`);
+      setStatusMsg({ type: 'error', text: `지문 자동 등록 오류: ${err.message}` });
     } finally {
       setIsIngesting(false);
     }
@@ -64,6 +67,17 @@ export const IngestModal: React.FC<IngestModalProps> = ({ onClose, onAddPassage,
             <i className="fa-solid fa-xmark"></i>
           </button>
         </div>
+
+        {statusMsg && (
+          <div className={`p-3 rounded-xl text-xs flex items-center space-x-2 ${
+            statusMsg.type === 'success'
+              ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
+              : 'bg-rose-500/10 border border-rose-500/30 text-rose-300'
+          }`}>
+            <i className={`fa-solid ${statusMsg.type === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation'}`}></i>
+            <span>{statusMsg.text}</span>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <div>

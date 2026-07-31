@@ -51,7 +51,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Nav Items */}
         <nav className="p-3 space-y-1">
           <button
-            onClick={() => setActiveTab('library')}
+            type="button"
+            onClick={(e) => { e.preventDefault(); setActiveTab('library'); }}
             className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'library' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
             }`}
@@ -61,7 +62,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('orchestrator')}
+            type="button"
+            onClick={(e) => { e.preventDefault(); setActiveTab('orchestrator'); }}
             className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'orchestrator' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
             }`}
@@ -71,7 +73,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('socratic')}
+            type="button"
+            onClick={(e) => { e.preventDefault(); setActiveTab('socratic'); }}
             className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'socratic' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
             }`}
@@ -81,7 +84,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('generator')}
+            type="button"
+            onClick={(e) => { e.preventDefault(); setActiveTab('generator'); }}
             className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'generator' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
             }`}
@@ -91,7 +95,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('vocab')}
+            type="button"
+            onClick={(e) => { e.preventDefault(); setActiveTab('vocab'); }}
             className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'vocab' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
             }`}
@@ -103,7 +108,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Admin Dashboard Navigation */}
           {isAdmin && (
             <button
-              onClick={() => setActiveTab('admin')}
+              type="button"
+              onClick={(e) => { e.preventDefault(); setActiveTab('admin'); }}
               className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-all border border-purple-500/30 ${
                 activeTab === 'admin'
                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-950/50'

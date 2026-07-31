@@ -161,19 +161,19 @@ export const SocraticTab: React.FC<SocraticTabProps> = ({ selectedPassage, custo
       {/* Quick Question Chips */}
       <div className="flex flex-wrap gap-2 shrink-0">
         {[
-          "📌 이 지문의 주제와 요지를 쉽게 설명해줘",
-          "🔍 문장의 주어/동사 구문 및 어법 분석해줘",
-          "💡 핵심 어휘와 문맥상 의미를 가르쳐줘",
-          "⚡ 역접/연결어의 흐름과 필자의 어조 변화는?"
+          { emoji: "📌", text: "이 지문의 주제와 요지를 쉽게 설명해줘" },
+          { emoji: "🔍", text: "문장의 주어/동사 구문 및 어법 분석해줘" },
+          { emoji: "💡", text: "핵심 어휘와 문맥상 의미를 가르쳐줘" },
+          { emoji: "⚡", text: "역접/연결어의 흐름과 필자의 어조 변화는?" }
         ].map((chip, idx) => (
           <button
             key={idx}
-            onClick={() => {
-              setInput(chip.replace(/^[📌🔍💡⚡]\s*/, ''));
-            }}
+            type="button"
+            onClick={() => setInput(chip.text)}
             className="text-[11px] bg-slate-900 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 px-3 py-1.5 rounded-lg border border-emerald-500/20 hover:border-emerald-500/40 transition-all font-medium flex items-center space-x-1"
           >
-            <span>{chip}</span>
+            <span className="mr-1">{chip.emoji}</span>
+            <span>{chip.text}</span>
           </button>
         ))}
       </div>

@@ -36,6 +36,9 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   const [copied, setCopied] = useState(false);
 
   // Load accumulated real data from Firestore DB (or LocalStorage fallback)
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+
   const loadData = async () => {
     const sList = await fetchFirestoreStudentActivities();
     const socList = await fetchFirestoreSocraticSummaries();
@@ -48,16 +51,16 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   }, []);
 
   const handleResetData = () => {
-    if (confirm('수집된 학습자 통계 데이터를 정말로 초기화하시겠습니까?')) {
-      clearAnalyticsData();
-      loadData();
-    }
+    clearAnalyticsData();
+    loadData();
+    setShowResetConfirm(false);
   };
 
   const handleGenerateStudentReport = async (student: StudentActivity) => {
     setSelectedStudent(student);
     setIsGeneratingReport(true);
     setReportResult(null);
+    setReportError(null);
     setCopied(false);
 
     const studentSocraticLogs = socSummaries.filter(
@@ -70,6 +73,9 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           student,
+          studentEmail: student.email,
+          studentName: student.name,
+          records: studentSocraticLogs,
           socraticLogs: studentSocraticLogs,
         }),
       });
@@ -80,7 +86,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         throw new Error(data.error || '보고서 생성 실패');
       }
     } catch (err: any) {
-      alert(`AI 세특 & 피드백 리포트 생성 오류: ${err.message}`);
+      setReportError(`AI 세특 & 피드백 리포트 생성 오류: ${err.message}`);
     } finally {
       setIsGeneratingReport(false);
     }
@@ -338,6 +344,13 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
+
+            {reportError && (
+              <div className="p-4 bg-rose-500/10 border border-rose-500/30 text-rose-300 rounded-xl text-xs flex items-center space-x-2">
+                <i className="fa-solid fa-triangle-exclamation"></i>
+                <span>{reportError}</span>
+              </div>
+            )}
 
             {isGeneratingReport ? (
               <div className="py-16 text-center space-y-4">
