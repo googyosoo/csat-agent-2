@@ -1172,4 +1172,3 @@ if (!process.env.VERCEL) {
   startServer();
 }
 var server_default = app;
-//# sourceMappingURL=index.js.map
