@@ -191,7 +191,7 @@ export const OrchestratorTab: React.FC<OrchestratorTabProps> = ({ selectedPassag
             {agentLogs.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-600">
                 <i className="fa-solid fa-robot text-4xl mb-2 text-slate-700"></i>
-                <p>Gemini 다중 에이전트 분석 준비 중...</p>
+                <p>수능 다중 에이전트 분석 준비 중...</p>
               </div>
             ) : (
               agentLogs.map((log, i) => (
@@ -263,7 +263,7 @@ export const OrchestratorTab: React.FC<OrchestratorTabProps> = ({ selectedPassag
               <h4 className="text-sm font-bold text-slate-300">
                 [{selectedPassage.lesson} {selectedPassage.itemNo}] 지문 분석 진행 중...
               </h4>
-              <p className="text-xs mt-1 text-slate-400">Gemini 다중 에이전트 리포트를 생성하고 있습니다.</p>
+              <p className="text-xs mt-1 text-slate-400">수능 전문 다중 에이전트 리포트를 생성하고 있습니다.</p>
             </div>
           )}
         </div>

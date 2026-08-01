@@ -94,7 +94,7 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
           <div>
             <h3 className="text-lg font-bold text-white flex items-center space-x-2">
               <i className="fa-solid fa-wand-magic-sparkles text-amber-400"></i>
-              <span>Gemini 수능 변형문항 전문 생성기</span>
+              <span>수능 변형문항 전문 AI 생성기</span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
               [{selectedPassage.lesson || ''} {selectedPassage.itemNo || ''}] 지문의 논리적 특성에 맞춘 유형별 고품질 수능 문제 정밀 생성
@@ -158,7 +158,7 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
               <span>변형 문항 생성 중... ({elapsedSeconds}초 경과 / 최대 30초 소요)</span>
             </div>
             <p className="text-xs text-slate-400">
-              Gemini가 수능 출제 기준에 맞추어 빈칸 위치, 어법 오류 및 해설 논리를 검토하고 있습니다.
+              수능 출제 AI가 출제 기준에 맞추어 빈칸 위치, 어법 오류 및 해설 논리를 검토하고 있습니다.
             </p>
             <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
               <div

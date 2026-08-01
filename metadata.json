@@ -1,1 +1,1 @@
-{"name":"csat-agent-1","description":"2027 심화영어II (실전모의고사 3회~5회 전 지문 탑재) Gemini 3 Flash AI 오케스트레이터, 소크라테스 튜터, 변형문항 생성기 플랫폼","requestFramePermissions":[],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}
+{"name":"csat-agent-1","description":"2027 심화영어II (실전모의고사 3회~5회 전 지문 탑재) 수능 AI 오케스트레이터, 소크라테스 튜터, 변형문항 생성기 플랫폼","requestFramePermissions":[],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}
