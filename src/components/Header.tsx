@@ -10,6 +10,7 @@ interface HeaderProps {
   customApiKey: string;
   setCustomApiKey: (key: string) => void;
   authUser: User | null;
+  onToggleSidebar?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,6 +21,7 @@ export const Header: React.FC<HeaderProps> = ({
   customApiKey,
   setCustomApiKey,
   authUser,
+  onToggleSidebar,
 }) => {
   const [isLoggingIn, setIsLoggingIn] = React.useState(false);
   const [theme, setTheme] = React.useState<'dark' | 'light'>(() => {
@@ -57,13 +59,23 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-14 border-b border-slate-800 px-6 flex items-center justify-between bg-slate-900/80 backdrop-blur-md shrink-0 z-10">
-      <div className="flex items-center space-x-3 truncate">
+    <header className="h-14 border-b border-slate-800 px-3 md:px-6 flex items-center justify-between bg-slate-900/80 backdrop-blur-md shrink-0 z-10">
+      <div className="flex items-center space-x-2 md:space-x-3 truncate">
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="md:hidden text-slate-300 hover:text-white p-2 rounded-lg bg-slate-800 border border-slate-700 shrink-0"
+            title="메뉴 열기"
+          >
+            <i className="fa-solid fa-bars text-sm"></i>
+          </button>
+        )}
         <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold text-xs border border-blue-500/30 shrink-0">
           {selectedPassage.lesson} {selectedPassage.itemNo}
         </span>
-        <span className="text-xs text-slate-400 shrink-0">[{selectedPassage.type}]</span>
-        <h2 className="text-sm font-bold text-slate-200 truncate max-w-md">{selectedPassage.title}</h2>
+        <span className="hidden sm:inline text-xs text-slate-400 shrink-0">[{selectedPassage.type}]</span>
+        <h2 className="text-xs md:text-sm font-bold text-slate-200 truncate max-w-[120px] sm:max-w-xs md:max-w-md">{selectedPassage.title}</h2>
       </div>
 
       <div className="flex items-center space-x-3 shrink-0">

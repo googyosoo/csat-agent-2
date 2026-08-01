@@ -13,6 +13,8 @@ interface SidebarProps {
   setFilterLesson: (lesson: string) => void;
   onOpenIngestModal: () => void;
   authUser?: User | null;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -25,6 +27,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setFilterLesson,
   onOpenIngestModal,
   authUser,
+  isOpen = false,
+  onClose,
 }) => {
   const filteredPassages = filterLesson === 'ALL'
     ? dataset
@@ -32,27 +36,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const availableLessons = Array.from(new Set(dataset.map(p => p.lesson)));
   const lessons = ['ALL', ...availableLessons];
-  const isAdmin = authUser ? isAdminUser(authUser.email) : true; // Enabled for preview access
+  const isAdmin = authUser ? isAdminUser(authUser.email) : true;
+
+  const handleTabSelect = (tabKey: string) => {
+    setActiveTab(tabKey);
+    if (onClose) onClose();
+  };
 
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between z-20 shrink-0 h-screen">
-      <div>
-        {/* App Logo */}
-        <div className="p-5 border-b border-slate-800 flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-purple-600 to-cyan-500 flex items-center justify-center text-white font-black text-xl shadow-lg">
-            <i className="fa-solid fa-graduation-cap"></i>
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 md:hidden transition-opacity"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar Drawer Container */}
+      <aside
+        className={`fixed md:static inset-y-0 left-0 z-50 w-72 md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 h-screen transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        <div>
+          {/* App Logo & Mobile Close Button */}
+          <div className="p-4 md:p-5 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-purple-600 to-cyan-500 flex items-center justify-center text-white font-black text-xl shadow-lg shrink-0">
+                <i className="fa-solid fa-graduation-cap"></i>
+              </div>
+              <div>
+                <h1 className="font-bold text-slate-100 text-sm leading-tight">2027 심화영어II</h1>
+                <span className="text-xs text-blue-400 font-semibold tracking-wider">CSAT-AI Engine</span>
+              </div>
+            </div>
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="md:hidden text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800/60"
+                title="메뉴 닫기"
+              >
+                <i className="fa-solid fa-xmark text-base"></i>
+              </button>
+            )}
           </div>
-          <div>
-            <h1 className="font-bold text-slate-100 text-sm leading-tight">2027 심화영어II</h1>
-            <span className="text-xs text-blue-400 font-semibold tracking-wider">CSAT-AI Engine</span>
-          </div>
-        </div>
 
         {/* Nav Items */}
         <nav className="p-3 space-y-1">
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); setActiveTab('library'); }}
+            onClick={(e) => { e.preventDefault(); handleTabSelect('library'); }}
             className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'library' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
             }`}
@@ -63,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); setActiveTab('orchestrator'); }}
+            onClick={(e) => { e.preventDefault(); handleTabSelect('orchestrator'); }}
             className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'orchestrator' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
             }`}
@@ -74,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); setActiveTab('socratic'); }}
+            onClick={(e) => { e.preventDefault(); handleTabSelect('socratic'); }}
             className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'socratic' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
             }`}
@@ -85,7 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); setActiveTab('generator'); }}
+            onClick={(e) => { e.preventDefault(); handleTabSelect('generator'); }}
             className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'generator' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
             }`}
@@ -96,7 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); setActiveTab('vocab'); }}
+            onClick={(e) => { e.preventDefault(); handleTabSelect('vocab'); }}
             className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'vocab' ? 'bg-pink-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
             }`}
@@ -109,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {isAdmin && (
             <button
               type="button"
-              onClick={(e) => { e.preventDefault(); setActiveTab('admin'); }}
+              onClick={(e) => { e.preventDefault(); handleTabSelect('admin'); }}
               className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-all border border-purple-500/30 ${
                 activeTab === 'admin'
                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-950/50'
@@ -176,5 +211,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
     </aside>
-  );
+  </>
+);
 };

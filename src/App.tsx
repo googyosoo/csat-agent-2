@@ -26,6 +26,8 @@ export default function App() {
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [deniedReason, setDeniedReason] = useState<string | null>(null);
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   useEffect(() => {
     const unsubscribe = subscribeToAuth(async (user) => {
       if (user) {
@@ -81,22 +83,33 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-100 font-sans">
-      {/* Sidebar */}
+    <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-100 font-sans relative">
+      {/* Responsive Sidebar */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          setActiveTab(tab);
+          setIsSidebarOpen(false);
+        }}
         dataset={dataset}
         selectedPassage={selectedPassage}
-        setSelectedPassage={setSelectedPassage}
+        setSelectedPassage={(p) => {
+          setSelectedPassage(p);
+          setIsSidebarOpen(false);
+        }}
         filterLesson={filterLesson}
         setFilterLesson={setFilterLesson}
-        onOpenIngestModal={() => setShowIngestModal(true)}
+        onOpenIngestModal={() => {
+          setShowIngestModal(true);
+          setIsSidebarOpen(false);
+        }}
         authUser={authUser}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
 
       {/* Main Workspace */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-950">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-950 min-w-0">
         <Header
           selectedPassage={selectedPassage}
           isSpeaking={isSpeaking}
@@ -105,10 +118,11 @@ export default function App() {
           customApiKey={customApiKey}
           setCustomApiKey={setCustomApiKey}
           authUser={authUser}
+          onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         />
 
-        {/* Tab Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        {/* Tab Content with responsive padding */}
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
           {activeTab === 'library' && (
             <LibraryTab
               selectedPassage={selectedPassage}
