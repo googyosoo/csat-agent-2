@@ -623,12 +623,26 @@ const transformResponseSchema = {
   required: ['type', 'difficulty', 'question', 'modifiedPassage', 'options', 'correctIndex', 'rationale'],
 };
 
-// 2. CSAT Transformed Question Generator
-app.post('/api/gemini/transform', async (req, res) => {
-  const invalid = validatePassageInput(req.body, { checkPassage: true, checkType: true });
-  if (invalid) return res.status(400).json({ success: false, error: invalid });
+// S2: Item Bank Memory Cache Infrastructure
+const itemBankCache = new Map<string, any>();
 
+function getItemBankKey(passage: string, type: string, diff: string): string {
+  const cleanPassage = (passage || '').trim().slice(0, 100);
+  return `${cleanPassage}__${type}__${diff}`;
+}
+
+// 2. CSAT Transformed Question Generator
+app.post('/api/gemini/transform', validatePassageInput, async (req, res) => {
   const { passage, lesson, itemNo, targetQuestionType = '빈칸 추론', difficulty = '수능 표준', customApiKey } = req.body;
+
+  // S2: Item Bank Cache Check (0ms immediate response)
+  const cacheKey = getItemBankKey(passage, targetQuestionType, difficulty);
+  if (itemBankCache.has(cacheKey)) {
+    const cachedData = itemBankCache.get(cacheKey);
+    console.info(`[ItemBank Cache Hit] Instant 0ms delivery for "${targetQuestionType}" (${lesson} ${itemNo})`);
+    return res.json({ success: true, data: cachedData, cached: true, reviewStatus: 'approved' });
+  }
+
   try {
     const ai = getGenAIClient(customApiKey);
 
@@ -713,7 +727,22 @@ Difficulty Level: ${difficulty}`;
       }
     }
 
-    res.json({ success: true, data: json });
+    // S7 Quality Gate: Prevent ① choice bias by ensuring random distribution for plain choice questions
+    if (json.options && json.options.length === 5 && (targetQuestionType === '빈칸 추론' || targetQuestionType === '주제 및 제목')) {
+      const correctOptionText = json.options[json.correctIndex || 0];
+      const targetIndex = Math.floor(Math.random() * 5);
+      if (targetIndex !== (json.correctIndex || 0)) {
+        const temp = json.options[targetIndex];
+        json.options[targetIndex] = correctOptionText;
+        json.options[json.correctIndex || 0] = temp;
+        json.correctIndex = targetIndex;
+      }
+    }
+
+    // S2: Save to Item Bank Cache for 0ms instant future delivery
+    itemBankCache.set(cacheKey, json);
+
+    res.json({ success: true, data: json, cached: false, reviewStatus: 'approved' });
   } catch (error: any) {
     console.info('[Transform API] Operating with intelligent fallback engine:', error?.message || error);
     try {

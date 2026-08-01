@@ -158,7 +158,25 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             return (
               <div
                 key={idx}
-                onClick={() => setSelectedOption(idx)}
+                onClick={async () => {
+                  if (isAnswered) return;
+                  setSelectedOption(idx);
+                  if (authUser?.email) {
+                    const { recordLearningEvent } = await import('../lib/analytics');
+                    recordLearningEvent({
+                      studentEmail: authUser.email,
+                      studentName: authUser.displayName || undefined,
+                      passageId: selectedPassage.id,
+                      passageTitle: selectedPassage.title,
+                      lesson: selectedPassage.lesson,
+                      itemNo: selectedPassage.itemNo,
+                      questionType: selectedPassage.type,
+                      selectedIndex: idx,
+                      correctIndex: selectedPassage.answerIndex,
+                      isCorrect: idx === selectedPassage.answerIndex,
+                    }).catch(console.error);
+                  }
+                }}
                 className={`p-4 rounded-xl border text-sm flex items-center justify-between cursor-pointer transition-all duration-200 ${optionStyle}`}
               >
                 <span className="flex items-center space-x-3.5">

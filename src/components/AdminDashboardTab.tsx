@@ -4,8 +4,10 @@ import { isAdminUser, ADMIN_EMAILS } from '../lib/adminAuth';
 import {
   StudentActivity,
   SocraticSummary,
+  LearningEvent,
   fetchFirestoreStudentActivities,
   fetchFirestoreSocraticSummaries,
+  getStoredLearningEvents,
   calculateAnalyticsMetrics,
   clearAnalyticsData,
 } from '../lib/analytics';
@@ -27,6 +29,7 @@ interface StudentReportResult {
 export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }) => {
   const [students, setStudents] = useState<StudentActivity[]>([]);
   const [socSummaries, setSocSummaries] = useState<SocraticSummary[]>([]);
+  const [learningEvents, setLearningEvents] = useState<LearningEvent[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<StudentActivity | null>(null);
 
@@ -42,8 +45,10 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   const loadData = async () => {
     const sList = await fetchFirestoreStudentActivities();
     const socList = await fetchFirestoreSocraticSummaries();
+    const evList = getStoredLearningEvents();
     setStudents(sList);
     setSocSummaries(socList);
+    setLearningEvents(evList);
   };
 
   useEffect(() => {
@@ -439,6 +444,56 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
           </div>
         </div>
       )}
+      {/* S1: Append-Only Learning Event Stream Log Card */}
+      <div className="bg-slate-900 border border-slate-800 p-5 rounded-3xl space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-100 flex items-center space-x-2">
+            <i className="fa-solid fa-list-check text-cyan-400"></i>
+            <span>실시간 학생 풀이 & 사고 이력 누적 스트림 (`learningEvents`)</span>
+          </h3>
+          <span className="text-xs text-slate-400 font-mono">총 {learningEvents.length}건 누적됨</span>
+        </div>
+        {learningEvents.length === 0 ? (
+          <p className="text-xs text-slate-500 py-3 text-center">아직 축적된 실시간 학습 이벤트 로그가 없습니다.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-950 text-slate-400 font-mono border-b border-slate-800">
+                <tr>
+                  <th className="p-2.5">일시</th>
+                  <th className="p-2.5">학생</th>
+                  <th className="p-2.5">지문</th>
+                  <th className="p-2.5">유형</th>
+                  <th className="p-2.5">정답 여부</th>
+                  <th className="p-2.5">학생 사고 근거 / 소감</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {learningEvents.slice(0, 10).map((ev) => (
+                  <tr key={ev.id} className="hover:bg-slate-800/30">
+                    <td className="p-2.5 text-slate-400 font-mono text-[11px]">{new Date(ev.timestamp).toLocaleTimeString('ko-KR')}</td>
+                    <td className="p-2.5 text-slate-200 font-bold">{ev.studentName || ev.studentEmail.split('@')[0]}</td>
+                    <td className="p-2.5 text-slate-300 font-mono">{ev.lesson} {ev.itemNo}</td>
+                    <td className="p-2.5 text-purple-300">{ev.questionType || '지문풀이'}</td>
+                    <td className="p-2.5">
+                      {ev.isCorrect !== undefined ? (
+                        ev.isCorrect ? (
+                          <span className="text-emerald-400 font-bold">⭕ 정답</span>
+                        ) : (
+                          <span className="text-rose-400 font-bold">❌ 오답</span>
+                        )
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </td>
+                    <td className="p-2.5 text-slate-300 truncate max-w-xs">{ev.reasonText || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

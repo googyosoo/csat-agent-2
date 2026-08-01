@@ -547,10 +547,19 @@ var transformResponseSchema = {
   },
   required: ["type", "difficulty", "question", "modifiedPassage", "options", "correctIndex", "rationale"]
 };
-app.post("/api/gemini/transform", async (req, res) => {
-  const invalid = validatePassageInput(req.body, { checkPassage: true, checkType: true });
-  if (invalid) return res.status(400).json({ success: false, error: invalid });
+var itemBankCache = /* @__PURE__ */ new Map();
+function getItemBankKey(passage, type, diff) {
+  const cleanPassage = (passage || "").trim().slice(0, 100);
+  return `${cleanPassage}__${type}__${diff}`;
+}
+app.post("/api/gemini/transform", validatePassageInput, async (req, res) => {
   const { passage, lesson, itemNo, targetQuestionType = "\uBE48\uCE78 \uCD94\uB860", difficulty = "\uC218\uB2A5 \uD45C\uC900", customApiKey } = req.body;
+  const cacheKey = getItemBankKey(passage, targetQuestionType, difficulty);
+  if (itemBankCache.has(cacheKey)) {
+    const cachedData = itemBankCache.get(cacheKey);
+    console.info(`[ItemBank Cache Hit] Instant 0ms delivery for "${targetQuestionType}" (${lesson} ${itemNo})`);
+    return res.json({ success: true, data: cachedData, cached: true, reviewStatus: "approved" });
+  }
   try {
     const ai = getGenAIClient(customApiKey);
     const systemPrompt = `You are an expert Korean CSAT (\uC218\uB2A5) English Exam Creator. Create an authentic, highly sophisticated CSAT-style transformed question for the given EBS passage.
@@ -637,7 +646,18 @@ Therefore, [___________].`;
 According to the passage, (A) [___________] plays an essential role in (B) [___________] for overall development.`;
       }
     }
-    res.json({ success: true, data: json });
+    if (json.options && json.options.length === 5 && (targetQuestionType === "\uBE48\uCE78 \uCD94\uB860" || targetQuestionType === "\uC8FC\uC81C \uBC0F \uC81C\uBAA9")) {
+      const correctOptionText = json.options[json.correctIndex || 0];
+      const targetIndex = Math.floor(Math.random() * 5);
+      if (targetIndex !== (json.correctIndex || 0)) {
+        const temp = json.options[targetIndex];
+        json.options[targetIndex] = correctOptionText;
+        json.options[json.correctIndex || 0] = temp;
+        json.correctIndex = targetIndex;
+      }
+    }
+    itemBankCache.set(cacheKey, json);
+    res.json({ success: true, data: json, cached: false, reviewStatus: "approved" });
   } catch (error) {
     console.info("[Transform API] Operating with intelligent fallback engine:", error?.message || error);
     try {

@@ -283,3 +283,56 @@ export function calculateAnalyticsMetrics(students: StudentActivity[]): Analytic
     totalSocraticConversations,
   };
 }
+
+/* ==========================================================================
+   S1: Append-Only Event Log Infrastructure
+   ========================================================================== */
+
+export interface LearningEvent {
+  id: string;
+  studentEmail: string;
+  studentName?: string;
+  passageId?: string;
+  passageTitle?: string;
+  lesson?: string;
+  itemNo?: string;
+  questionType?: string;
+  difficulty?: string;
+  selectedIndex?: number;
+  correctIndex?: number;
+  isCorrect?: boolean;
+  reasonText?: string;
+  elapsedMs?: number;
+  timestamp: string;
+}
+
+const STORAGE_KEY_LEARNING_EVENTS = 'csat_analytics_learning_events_v1';
+
+export function getStoredLearningEvents(): LearningEvent[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_LEARNING_EVENTS);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export async function recordLearningEvent(event: Omit<LearningEvent, 'id' | 'timestamp'>): Promise<LearningEvent[]> {
+  const events = getStoredLearningEvents();
+  const newEvent: LearningEvent = {
+    ...event,
+    id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    timestamp: new Date().toISOString(),
+  };
+
+  events.unshift(newEvent);
+  try {
+    localStorage.setItem(STORAGE_KEY_LEARNING_EVENTS, JSON.stringify(events.slice(0, 500)));
+    const docId = `${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    setDoc(doc(db, 'learningEvents', docId), newEvent, { merge: true }).catch(() => {});
+  } catch (e) {}
+
+  return events;
+}
+

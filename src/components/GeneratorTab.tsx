@@ -174,15 +174,24 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
             {/* Badges Header */}
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
               <div className="flex items-center space-x-2">
-                <span className="text-xs font-bold text-amber-300 bg-amber-500/20 px-3 py-1 rounded-lg border border-amber-500/30 flex items-center space-x-1">
-                  <i className="fa-solid fa-list-check text-[10px]"></i>
-                  <span>유형: {generatedItem.type}</span>
+                <span className="text-xs font-bold text-amber-300 bg-amber-500/20 px-3 py-1 rounded-lg border border-amber-500/30">
+                  {generatedItem.type || targetType}
                 </span>
                 <span className="text-xs font-bold text-purple-300 bg-purple-500/20 px-3 py-1 rounded-lg border border-purple-500/30">
                   {generatedItem.difficulty || difficulty}
                 </span>
               </div>
-              <span className="text-[11px] text-slate-500 font-mono">CSAT Item Specification Compliant</span>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center space-x-1.5 transition-all shadow print:hidden"
+                  title="A4 수능 시험지 양식으로 인쇄 및 PDF 저장"
+                >
+                  <i className="fa-solid fa-print"></i>
+                  <span>수능 시험지 인쇄 / PDF</span>
+                </button>
+              </div>
             </div>
 
             {/* Instruction */}
