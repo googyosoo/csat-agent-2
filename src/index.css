@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+html.light {
+  color-scheme: light;
+  filter: invert(0.92) hue-rotate(180deg);
+}
+
+html.light img,
+html.light video,
+html.light iframe,
+html.light .no-invert {
+  filter: invert(1) hue-rotate(180deg);
+}

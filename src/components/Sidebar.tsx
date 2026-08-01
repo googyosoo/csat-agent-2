@@ -125,13 +125,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Passage Selector & Add New Passage */}
       <div className="p-3 border-t border-slate-800 space-y-2">
-        <button
-          onClick={onOpenIngestModal}
-          className="w-full py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-xs rounded-lg shadow hover:opacity-90 transition-all flex items-center justify-center space-x-2"
-        >
-          <i className="fa-solid fa-plus"></i>
-          <span>새 지문 (실전 6회~) 자동 등록</span>
-        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); onOpenIngestModal(); }}
+            className="w-full py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold text-xs rounded-lg shadow hover:opacity-90 transition-all flex items-center justify-center space-x-2"
+          >
+            <i className="fa-solid fa-plus"></i>
+            <span>새 지문 (실전 6회~) 자동 등록</span>
+          </button>
+        )}
 
         <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
           <label className="block text-[11px] font-bold text-slate-400 mb-1">강별 필터 선택</label>

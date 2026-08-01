@@ -22,6 +22,20 @@ export const Header: React.FC<HeaderProps> = ({
   authUser,
 }) => {
   const [isLoggingIn, setIsLoggingIn] = React.useState(false);
+  const [theme, setTheme] = React.useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('app_theme') as 'dark' | 'light') || 'dark';
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem('app_theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    }
+  }, [theme]);
 
   const handleGoogleLogin = async () => {
     setIsLoggingIn(true);
@@ -53,6 +67,36 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="flex items-center space-x-3 shrink-0">
+        {/* Dark / Light Theme Toggle Switch */}
+        <div className="flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 shrink-0">
+          <button
+            type="button"
+            onClick={() => setTheme('dark')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+              theme === 'dark'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="다크 모드 적용"
+          >
+            <i className="fa-solid fa-moon text-[11px]"></i>
+            <span className="hidden sm:inline">다크</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTheme('light')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+              theme === 'light'
+                ? 'bg-amber-500 text-slate-950 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="일반(라이트) 모드 적용"
+          >
+            <i className="fa-solid fa-sun text-[11px]"></i>
+            <span className="hidden sm:inline">일반</span>
+          </button>
+        </div>
+
         <div className="hidden lg:flex items-center bg-slate-950 px-2.5 py-1 rounded-lg border border-emerald-500/30 space-x-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           <span className="text-[11px] font-medium text-emerald-300">서버 시스템 연동 (유료 키 입력 불필요)</span>
