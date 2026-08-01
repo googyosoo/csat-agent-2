@@ -11,6 +11,7 @@ import { VocabTab } from './components/VocabTab';
 import { IngestModal } from './components/IngestModal';
 import { MistakeVaultModal } from './components/MistakeVaultModal';
 import { AdminDashboardTab } from './components/AdminDashboardTab';
+import { LandingPage } from './components/LandingPage';
 import { subscribeToAuth, logout, User } from './lib/firebase';
 import { validateUserAccess, ALLOWED_STUDENT_DOMAIN, ADMIN_EMAILS } from './lib/adminAuth';
 
@@ -27,6 +28,7 @@ export default function App() {
   const [showMistakeVault, setShowMistakeVault] = useState(false);
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [deniedReason, setDeniedReason] = useState<string | null>(null);
+  const [isGuestPreview, setIsGuestPreview] = useState(false);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -83,6 +85,11 @@ export default function App() {
     setDataset(prev => [newPassage, ...prev]);
     setSelectedPassage(newPassage);
   };
+
+  // Render Landing Welcome Portal Page for unauthenticated users
+  if (!authUser && !isGuestPreview) {
+    return <LandingPage onStartGuestPreview={() => setIsGuestPreview(true)} />;
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-100 font-sans relative">
