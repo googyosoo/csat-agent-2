@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { EBSPassage } from '../types';
+import { User, signInWithGoogle } from '../lib/firebase';
 
 interface LibraryTabProps {
   selectedPassage: EBSPassage;
   isSpeaking?: boolean;
   onSpeak?: (text: string) => void;
   onStopSpeak?: () => void;
+  authUser?: User | null;
 }
 
 export const LibraryTab: React.FC<LibraryTabProps> = ({
@@ -13,6 +15,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   isSpeaking = false,
   onSpeak,
   onStopSpeak,
+  authUser,
 }) => {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
 
@@ -116,6 +119,22 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             </button>
           )}
         </div>
+
+        {!authUser && (
+          <div className="p-3 bg-blue-950/40 border border-blue-500/30 rounded-xl text-blue-200 text-xs flex items-center justify-between gap-2 my-2">
+            <span className="flex items-center space-x-2">
+              <i className="fa-solid fa-user-lock text-blue-400"></i>
+              <span>Google 로그인(@simin.hs.kr) 후 문제 풀이 성취도 및 세특 학습 기록이 자동 저장됩니다.</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => signInWithGoogle().catch(console.error)}
+              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg text-[11px] shrink-0"
+            >
+              로그인하기
+            </button>
+          </div>
+        )}
 
         <div className="space-y-2.5">
           {selectedPassage.options.map((opt, idx) => {

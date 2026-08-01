@@ -115,13 +115,14 @@ export default function App() {
               isSpeaking={isSpeaking}
               onSpeak={speakText}
               onStopSpeak={stopSpeaking}
+              authUser={authUser}
             />
           )}
           {activeTab === 'orchestrator' && (
             <OrchestratorTab selectedPassage={selectedPassage} customApiKey={customApiKey} />
           )}
           {activeTab === 'socratic' && (
-            <SocraticTab selectedPassage={selectedPassage} customApiKey={customApiKey} />
+            <SocraticTab selectedPassage={selectedPassage} customApiKey={customApiKey} authUser={authUser} />
           )}
           {activeTab === 'generator' && (
             <GeneratorTab selectedPassage={selectedPassage} customApiKey={customApiKey} />

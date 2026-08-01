@@ -2,14 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { EBSPassage, ChatMessage } from '../types';
 import { safeFetchJson } from '../lib/api';
 import { recordSocraticQuestion } from '../lib/analytics';
-import { auth } from '../lib/firebase';
+import { User, signInWithGoogle } from '../lib/firebase';
 
 interface SocraticTabProps {
   selectedPassage: EBSPassage;
   customApiKey: string;
+  authUser?: User | null;
 }
 
-export const SocraticTab: React.FC<SocraticTabProps> = ({ selectedPassage, customApiKey }) => {
+export const SocraticTab: React.FC<SocraticTabProps> = ({ selectedPassage, customApiKey, authUser }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
@@ -21,6 +22,10 @@ export const SocraticTab: React.FC<SocraticTabProps> = ({ selectedPassage, custo
   }, [chatHistory, isThinking]);
 
   const sendMessage = async () => {
+    if (!authUser) {
+      alert('문항에 대한 생각 및 메타인지 소감 작성을 위해서는 로그인이 필요합니다.');
+      return;
+    }
     if (!input.trim() || isThinking) return;
 
     const currentPromptText = input;
@@ -169,8 +174,9 @@ export const SocraticTab: React.FC<SocraticTabProps> = ({ selectedPassage, custo
           <button
             key={idx}
             type="button"
+            disabled={!authUser}
             onClick={() => setInput(chip.text)}
-            className="text-[11px] bg-slate-900 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 px-3 py-1.5 rounded-lg border border-emerald-500/20 hover:border-emerald-500/40 transition-all font-medium flex items-center space-x-1"
+            className="text-[11px] bg-slate-900 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 px-3 py-1.5 rounded-lg border border-emerald-500/20 hover:border-emerald-500/40 transition-all font-medium flex items-center space-x-1 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <span className="mr-1">{chip.emoji}</span>
             <span>{chip.text}</span>
@@ -178,20 +184,39 @@ export const SocraticTab: React.FC<SocraticTabProps> = ({ selectedPassage, custo
         ))}
       </div>
 
+      {/* Auth Guard Warning Banner for Non-Logged In Users */}
+      {!authUser && (
+        <div className="p-3 bg-amber-950/50 border border-amber-500/40 rounded-xl text-amber-200 text-xs flex items-center justify-between gap-2 shrink-0 shadow-md">
+          <div className="flex items-center space-x-2">
+            <i className="fa-solid fa-lock text-amber-400"></i>
+            <span>문항에 대한 생각 및 메타인지 소감 작성을 위해서는 로그인이 필요합니다.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => signInWithGoogle().catch(console.error)}
+            className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-[11px] shrink-0 transition-all shadow"
+          >
+            <i className="fa-brands fa-google mr-1"></i>
+            Google 로그인
+          </button>
+        </div>
+      )}
+
       {/* Input */}
       <div className="flex items-center space-x-2 shrink-0">
         <input
           type="text"
           value={input}
+          disabled={!authUser}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-          placeholder="질문이나 구문/어휘/주제 질문을 입력하세요..."
-          className="flex-1 bg-slate-900 text-slate-100 text-xs rounded-xl p-3 border border-slate-800 focus:outline-none focus:border-emerald-500"
+          placeholder={authUser ? "문항에 대한 생각, 구문/어휘 질문 및 메타인지 소감을 작성해 보세요..." : "🔒 로그인 후 문항에 대한 생각 및 메타인지 소감 작성이 가능합니다."}
+          className="flex-1 bg-slate-900 text-slate-100 text-xs rounded-xl p-3 border border-slate-800 focus:outline-none focus:border-emerald-500 disabled:opacity-50 disabled:bg-slate-950 disabled:cursor-not-allowed"
         />
         <button
           onClick={sendMessage}
-          disabled={isThinking || !input.trim()}
-          className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all disabled:opacity-50"
+          disabled={!authUser || isThinking || !input.trim()}
+          className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <i className="fa-solid fa-paper-plane"></i>
         </button>
