@@ -1,0 +1,21 @@
+{
+  "short_name": "심화영어II AI",
+  "name": "2027 심화영어II CSAT-AI Engine",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2997/2997325.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2997/2997325.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#020617",
+  "theme_color": "#090d16",
+  "display": "standalone",
+  "orientation": "portrait"
+}

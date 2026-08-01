@@ -9,6 +9,7 @@ import { SocraticTab } from './components/SocraticTab';
 import { GeneratorTab } from './components/GeneratorTab';
 import { VocabTab } from './components/VocabTab';
 import { IngestModal } from './components/IngestModal';
+import { MistakeVaultModal } from './components/MistakeVaultModal';
 import { AdminDashboardTab } from './components/AdminDashboardTab';
 import { subscribeToAuth, logout, User } from './lib/firebase';
 import { validateUserAccess, ALLOWED_STUDENT_DOMAIN, ADMIN_EMAILS } from './lib/adminAuth';
@@ -23,6 +24,7 @@ export default function App() {
   const [customApiKey, setCustomApiKey] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showIngestModal, setShowIngestModal] = useState(false);
+  const [showMistakeVault, setShowMistakeVault] = useState(false);
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [deniedReason, setDeniedReason] = useState<string | null>(null);
 
@@ -119,6 +121,7 @@ export default function App() {
           setCustomApiKey={setCustomApiKey}
           authUser={authUser}
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+          onOpenMistakeVault={() => setShowMistakeVault(true)}
         />
 
         {/* Mobile Quick Navigation Chips Bar (Mobile/Tablet Only) */}
@@ -177,6 +180,14 @@ export default function App() {
           onClose={() => setShowIngestModal(false)}
           onAddPassage={handleAddPassage}
           customApiKey={customApiKey}
+        />
+      )}
+
+      {/* S5: Personal Mistake Vault Modal */}
+      {showMistakeVault && (
+        <MistakeVaultModal
+          onClose={() => setShowMistakeVault(false)}
+          authUser={authUser}
         />
       )}
 

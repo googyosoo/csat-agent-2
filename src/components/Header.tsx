@@ -11,6 +11,7 @@ interface HeaderProps {
   setCustomApiKey: (key: string) => void;
   authUser: User | null;
   onToggleSidebar?: () => void;
+  onOpenMistakeVault?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   setCustomApiKey,
   authUser,
   onToggleSidebar,
+  onOpenMistakeVault,
 }) => {
   const [isLoggingIn, setIsLoggingIn] = React.useState(false);
   const [theme, setTheme] = React.useState<'dark' | 'light'>(() => {
@@ -78,7 +80,20 @@ export const Header: React.FC<HeaderProps> = ({
         <h2 className="text-xs md:text-sm font-bold text-slate-200 truncate max-w-[120px] sm:max-w-xs md:max-w-md">{selectedPassage.title}</h2>
       </div>
 
-      <div className="flex items-center space-x-3 shrink-0">
+      <div className="flex items-center space-x-2.5 shrink-0">
+        {/* Personal Mistake Vault Button */}
+        {onOpenMistakeVault && (
+          <button
+            type="button"
+            onClick={onOpenMistakeVault}
+            className="px-2.5 py-1.5 bg-rose-950/70 hover:bg-rose-900/80 text-rose-300 border border-rose-500/40 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 shadow"
+            title="내가 틀린 문제와 쓴 생각 복습하기"
+          >
+            <i className="fa-solid fa-book-bookmark text-rose-400"></i>
+            <span className="hidden sm:inline">개인 오답노트</span>
+          </button>
+        )}
+
         {/* Dark / Light Theme Toggle Switch */}
         <div className="flex items-center bg-slate-950 p-0.5 rounded-xl border border-slate-800 shrink-0">
           <button
