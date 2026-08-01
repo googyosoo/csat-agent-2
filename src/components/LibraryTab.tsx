@@ -18,6 +18,9 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   authUser,
 }) => {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [metacognitionInput, setMetacognitionInput] = useState('');
+  const [isSavingSummary, setIsSavingSummary] = useState(false);
+  const [summarySuccessMsg, setSummarySuccessMsg] = useState('');
 
   // Reset selected option when passage changes
   useEffect(() => {
@@ -276,6 +279,98 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             </div>
           </div>
         )}
+
+        {/* ✍️ 문항에 대한 생각 및 메타인지 소감 작성 (생기부 세특 반영) */}
+        <div className="bg-slate-900/90 border border-purple-500/40 p-5 rounded-2xl space-y-4 shadow-xl shadow-purple-950/20">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl font-bold border border-purple-500/30">
+                <i className="fa-solid fa-pen-to-square"></i>
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h4 className="text-base font-extrabold text-white">문항에 대한 생각 및 메타인지 소감 작성</h4>
+                  <span className="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold text-[11px] border border-purple-500/40">
+                    생기부 세특 반영
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  문항을 풀고 난 느낌, 구문 분석 소감, 오답 이유 등을 작성해 보세요. 관리자 대시보드 및 세특 생성기에 자동 저장됩니다.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {!authUser ? (
+            <div className="bg-slate-950/90 border border-rose-500/40 p-5 rounded-xl text-center space-y-3">
+              <div className="flex items-center justify-center space-x-2 text-rose-400 font-extrabold text-sm">
+                <i className="fa-solid fa-lock"></i>
+                <span>🔒 학생 메타인지 소감 및 생기부 성찰 기록은 Google 로그인 후 작성 가능합니다.</span>
+              </div>
+              <p className="text-xs text-slate-400">
+                심인고등학교 학생 계정(<code className="text-cyan-300">@simin.hs.kr</code>) 또는 지정 관리자 계정으로 Google 로그인 후 소감을 작성하실 수 있습니다.
+              </p>
+              <button
+                type="button"
+                onClick={() => signInWithGoogle().catch(console.error)}
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all"
+              >
+                <i className="fa-brands fa-google mr-1.5"></i>
+                Google 로그인하기
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {summarySuccessMsg && (
+                <div className="p-3 bg-emerald-950/80 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs font-bold flex items-center justify-between">
+                  <span>{summarySuccessMsg}</span>
+                  <button onClick={() => setSummarySuccessMsg('')} className="text-emerald-400 hover:text-white">✕</button>
+                </div>
+              )}
+              <textarea
+                value={metacognitionInput}
+                onChange={(e) => setMetacognitionInput(e.target.value)}
+                placeholder={`[${selectedPassage.lesson} ${selectedPassage.itemNo} - ${selectedPassage.title}] 지문을 풀면서 파악한 핵심 구문 구조, 정답/오답의 직관적 원인, 세특 반영 소감을 적어보세요...`}
+                rows={4}
+                className="w-full bg-slate-950 text-slate-100 text-xs rounded-xl p-3.5 border border-slate-800 focus:outline-none focus:border-purple-500 font-sans leading-relaxed resize-none"
+              />
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-400">
+                  작성자: <strong className="text-slate-200">{authUser.displayName || authUser.email}</strong>
+                </span>
+                <button
+                  type="button"
+                  disabled={!metacognitionInput.trim() || isSavingSummary}
+                  onClick={async () => {
+                    if (!metacognitionInput.trim()) return;
+                    setIsSavingSummary(true);
+                    try {
+                      const { recordSocraticQuestion } = await import('../lib/analytics');
+                      await recordSocraticQuestion({
+                        studentEmail: authUser.email,
+                        studentName: authUser.displayName,
+                        passageTitle: selectedPassage.title,
+                        lesson: selectedPassage.lesson,
+                        itemNo: selectedPassage.itemNo,
+                        questionText: `[지문소감] ${metacognitionInput}`,
+                        hintLevel: 1,
+                      });
+                      setSummarySuccessMsg('🎉 학생의 메타인지 소감이 관리자 대시보드 및 세특 기록에 자동 저장되었습니다!');
+                      setMetacognitionInput('');
+                    } catch (err: any) {
+                      alert(`저장 중 오류가 발생했습니다: ${err?.message || err}`);
+                    } finally {
+                      setIsSavingSummary(false);
+                    }
+                  }}
+                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all disabled:opacity-40"
+                >
+                  {isSavingSummary ? '저장 중...' : '소감 제출 및 세특 저장'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

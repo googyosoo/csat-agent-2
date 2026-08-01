@@ -176,7 +176,7 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={handleGoogleLogin}
                 disabled={isLoggingIn}
                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs flex items-center space-x-2 transition-all shadow-md shadow-blue-900/30 disabled:opacity-50"
-                title="시민고등학교 계정(@simin.hs.kr) 또는 지정 관리자 이메일 전용"
+                title="심인고등학교 계정(@simin.hs.kr) 또는 지정 관리자 이메일 전용"
               >
                 <i className={`fa-brands fa-google ${isLoggingIn ? 'fa-spin' : ''}`}></i>
                 <span>{isLoggingIn ? '로그인 중...' : 'Google 로그인'}</span>
