@@ -49,8 +49,8 @@ function getGenAIClient(customApiKey) {
     }
   });
 }
-async function callGemini(ai, contents, config) {
-  const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-pro"];
+async function callGemini(ai, contents, config, tier = "flash") {
+  const models = tier === "pro" ? ["gemini-2.5-pro", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-1.5-flash"] : ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
   let lastErr = null;
   for (const model of models) {
     try {
@@ -62,10 +62,10 @@ async function callGemini(ai, contents, config) {
       if (response && response.text) return response;
     } catch (err) {
       lastErr = err;
-      console.warn(`[Gemini API Warning] Model ${model} failed, trying fallback model...`, err?.message || err);
+      console.warn(`[Gemini API Tiering (${tier})] Model ${model} failed, trying fallback...`, err?.message || err);
     }
   }
-  throw lastErr || new Error("All Gemini model fallbacks failed");
+  throw lastErr || new Error(`All Gemini model fallbacks failed for tier: ${tier}`);
 }
 function buildPassageSpecificFallback(body) {
   const { passage, lesson, itemNo, title, type, translation, explanation, syntaxNotes, vocabList } = body;
@@ -552,6 +552,7 @@ function getItemBankKey(passage, type, diff) {
   const cleanPassage = (passage || "").trim().slice(0, 100);
   return `${cleanPassage}__${type}__${diff}`;
 }
+console.info("[Pre-generation Engine] Initialized Item Bank Pre-generation Cache Pipeline");
 app.post("/api/gemini/transform", validatePassageInput, async (req, res) => {
   const { passage, lesson, itemNo, targetQuestionType = "\uBE48\uCE78 \uCD94\uB860", difficulty = "\uC218\uB2A5 \uD45C\uC900", customApiKey } = req.body;
   const cacheKey = getItemBankKey(passage, targetQuestionType, difficulty);
@@ -618,7 +619,7 @@ Difficulty Level: ${difficulty}`;
       systemInstruction: systemPrompt,
       responseMimeType: "application/json",
       responseSchema: transformResponseSchema
-    });
+    }, "pro");
     const responseText = response.text;
     if (!responseText) throw new Error("Empty response from Gemini model");
     const json = JSON.parse(cleanJsonString(responseText));

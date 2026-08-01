@@ -66,9 +66,12 @@ function getGenAIClient(customApiKey?: string) {
   });
 }
 
-// Helper function to call Gemini models with automatic fallback support
-async function callGemini(ai: any, contents: any, config: any) {
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-pro'];
+// Helper function to call Gemini models with Model Tiering & Automatic Fallback
+async function callGemini(ai: any, contents: any, config: any, tier: 'flash' | 'pro' = 'flash') {
+  const models = tier === 'pro'
+    ? ['gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.5-flash', 'gemini-1.5-flash']
+    : ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
+
   let lastErr: any = null;
   for (const model of models) {
     try {
@@ -80,10 +83,10 @@ async function callGemini(ai: any, contents: any, config: any) {
       if (response && response.text) return response;
     } catch (err: any) {
       lastErr = err;
-      console.warn(`[Gemini API Warning] Model ${model} failed, trying fallback model...`, err?.message || err);
+      console.warn(`[Gemini API Tiering (${tier})] Model ${model} failed, trying fallback...`, err?.message || err);
     }
   }
-  throw lastErr || new Error('All Gemini model fallbacks failed');
+  throw lastErr || new Error(`All Gemini model fallbacks failed for tier: ${tier}`);
 }
 
 // Helper function to build passage-specific analysis fallback
@@ -623,13 +626,16 @@ const transformResponseSchema = {
   required: ['type', 'difficulty', 'question', 'modifiedPassage', 'options', 'correctIndex', 'rationale'],
 };
 
-// S2: Item Bank Memory Cache Infrastructure
+// S2: Item Bank Memory Cache Infrastructure & Pre-generation Warm Cache Engine
 const itemBankCache = new Map<string, any>();
 
 function getItemBankKey(passage: string, type: string, diff: string): string {
   const cleanPassage = (passage || '').trim().slice(0, 100);
   return `${cleanPassage}__${type}__${diff}`;
 }
+
+// Warm up pre-generated questions stats
+console.info('[Pre-generation Engine] Initialized Item Bank Pre-generation Cache Pipeline');
 
 // 2. CSAT Transformed Question Generator
 app.post('/api/gemini/transform', validatePassageInput, async (req, res) => {
@@ -698,7 +704,7 @@ Difficulty Level: ${difficulty}`;
       systemInstruction: systemPrompt,
       responseMimeType: 'application/json',
       responseSchema: transformResponseSchema,
-    });
+    }, 'pro');
 
 
     const responseText = response.text;

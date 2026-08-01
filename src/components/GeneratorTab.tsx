@@ -34,7 +34,19 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
     return () => clearInterval(timer);
   }, [isGenerating]);
 
+  const [lastGenerateTime, setLastGenerateTime] = useState<number>(0);
+
   const generateQuestion = async () => {
+    if (isGenerating) return;
+
+    // 5-second Debounce / Throttling Lock against double clicks
+    const now = Date.now();
+    if (now - lastGenerateTime < 3000) {
+      setError('⚠️ 연속 클릭이 차단되었습니다. 잠시 후 다시 시도해 주세요 (3초 연타 방지 디바운싱 적용).');
+      return;
+    }
+    setLastGenerateTime(now);
+
     if (!selectedPassage || !selectedPassage.passage) {
       setError('변형 문제를 생성할 지문이 선택되지 않았습니다.');
       return;
