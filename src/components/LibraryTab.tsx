@@ -65,23 +65,38 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
         {/* Box Sentence if available (주어진 문장의 위치 등) */}
         {selectedPassage.boxSentence && (
-          <div className="mb-4 p-4 bg-amber-950/40 border border-amber-500/40 rounded-xl text-amber-200 text-sm leading-relaxed font-serif">
-            <span className="font-bold text-amber-400 block mb-1 text-xs uppercase tracking-wider">[주어진 문장 Box]</span>
+          <div className="mb-4 p-4 bg-amber-950/40 border border-amber-500/40 rounded-xl text-amber-200 text-sm leading-relaxed font-serif shadow-md">
+            <span className="font-bold text-amber-400 block mb-1.5 text-xs uppercase tracking-wider flex items-center space-x-1.5">
+              <i className="fa-solid fa-square-poll-horizontal"></i>
+              <span>[주어진 문장 Box]</span>
+            </span>
             {selectedPassage.boxSentence}
           </div>
         )}
 
-        {/* Summary Sentence if available (요약문 완성 등) */}
-        {selectedPassage.summarySentence && (
-          <div className="mb-4 p-4 bg-indigo-950/40 border border-indigo-500/40 rounded-xl text-indigo-200 text-sm leading-relaxed font-serif">
-            <span className="font-bold text-indigo-400 block mb-1 text-xs uppercase tracking-wider">[요약문 Box]</span>
-            {selectedPassage.summarySentence}
+        {/* Passage Display with Blank Highlighting */}
+        <div className="p-5 bg-slate-950 rounded-xl border border-slate-800 text-slate-200 leading-relaxed text-base font-sans selection:bg-blue-500 selection:text-white whitespace-pre-wrap">
+          <div
+            dangerouslySetInnerHTML={{
+              __html: selectedPassage.passage
+                .replace(/(_{3,}|\[\s*\]|\[\s*빈칸\s*\])/g, '<mark class="bg-amber-500/20 text-amber-300 font-extrabold px-3 py-1 border border-amber-500/50 rounded-lg inline-block my-0.5 shadow-sm"> (  빈칸  ) </mark>')
+                .replace(/<u>(.*?)<\/u>/g, '<u class="text-amber-300 font-bold underline decoration-amber-400 decoration-2 underline-offset-4">$1</u>')
+            }}
+          />
+        </div>
+
+        {/* Summary Sentence Box (Prominently rendered for Summary Type) */}
+        {(selectedPassage.summarySentence || selectedPassage.type === '요약문 완성') && (
+          <div className="mt-4 p-5 bg-indigo-950/60 border border-indigo-500/50 rounded-xl text-indigo-100 text-sm leading-relaxed font-serif shadow-lg">
+            <div className="font-extrabold text-indigo-300 block mb-2 text-xs uppercase tracking-wider flex items-center space-x-2 border-b border-indigo-500/30 pb-1.5">
+              <i className="fa-solid fa-receipt text-indigo-400"></i>
+              <span>[ 수능 요약문 완성 (Summary Box) ]</span>
+            </div>
+            <p className="text-slate-100 leading-relaxed font-sans text-sm">
+              {selectedPassage.summarySentence || '다음 글의 내용을 한 문장으로 요약하고자 한다. 빈칸 (A), (B)에 들어갈 말로 가장 적절한 것을 고르시오.'}
+            </p>
           </div>
         )}
-
-        <div className="p-5 bg-slate-950 rounded-xl border border-slate-800 text-slate-200 leading-relaxed text-base font-sans selection:bg-blue-500 selection:text-white whitespace-pre-wrap">
-          {selectedPassage.passage}
-        </div>
       </div>
 
       {/* Original EBS Questions & Interactive Choices */}

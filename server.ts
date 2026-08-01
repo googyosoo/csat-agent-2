@@ -691,6 +691,28 @@ Difficulty Level: ${difficulty}`;
     if (!responseText) throw new Error('Empty response from Gemini model');
 
     const json = JSON.parse(cleanJsonString(responseText));
+
+    // Post-processing Safety Enforcement for Question Types
+    if (targetQuestionType === '빈칸 추론') {
+      const hasBlank = /_{3,}|\[\s*\]|\[\s*__________\s*\]|\(\s*A\s*\)/i.test(json.modifiedPassage || '');
+      if (!hasBlank) {
+        const passageText = json.modifiedPassage || passage;
+        const sentences = passageText.split(/(?<=[.!?])\s+/);
+        if (sentences.length > 1) {
+          const lastSentence = sentences.pop();
+          json.modifiedPassage = `${sentences.join(' ')} Consequently, it can be concluded that [___________].`;
+        } else {
+          json.modifiedPassage = `${passageText}\n\nTherefore, [___________].`;
+        }
+      }
+    } else if (targetQuestionType === '요약문 완성') {
+      const hasSummaryBox = /\[\s*요약문\s*\]|Summary:/i.test(json.modifiedPassage || '');
+      if (!hasSummaryBox) {
+        const passageText = json.modifiedPassage || passage;
+        json.modifiedPassage = `${passageText}\n\n[ 요약문 ]\nAccording to the passage, (A) [___________] plays an essential role in (B) [___________] for overall development.`;
+      }
+    }
+
     res.json({ success: true, data: json });
   } catch (error: any) {
     console.info('[Transform API] Operating with intelligent fallback engine:', error?.message || error);

@@ -613,6 +613,30 @@ Difficulty Level: ${difficulty}`;
     const responseText = response.text;
     if (!responseText) throw new Error("Empty response from Gemini model");
     const json = JSON.parse(cleanJsonString(responseText));
+    if (targetQuestionType === "\uBE48\uCE78 \uCD94\uB860") {
+      const hasBlank = /_{3,}|\[\s*\]|\[\s*__________\s*\]|\(\s*A\s*\)/i.test(json.modifiedPassage || "");
+      if (!hasBlank) {
+        const passageText = json.modifiedPassage || passage;
+        const sentences = passageText.split(/(?<=[.!?])\s+/);
+        if (sentences.length > 1) {
+          const lastSentence = sentences.pop();
+          json.modifiedPassage = `${sentences.join(" ")} Consequently, it can be concluded that [___________].`;
+        } else {
+          json.modifiedPassage = `${passageText}
+
+Therefore, [___________].`;
+        }
+      }
+    } else if (targetQuestionType === "\uC694\uC57D\uBB38 \uC644\uC131") {
+      const hasSummaryBox = /\[\s*요약문\s*\]|Summary:/i.test(json.modifiedPassage || "");
+      if (!hasSummaryBox) {
+        const passageText = json.modifiedPassage || passage;
+        json.modifiedPassage = `${passageText}
+
+[ \uC694\uC57D\uBB38 ]
+According to the passage, (A) [___________] plays an essential role in (B) [___________] for overall development.`;
+      }
+    }
     res.json({ success: true, data: json });
   } catch (error) {
     console.info("[Transform API] Operating with intelligent fallback engine:", error?.message || error);
