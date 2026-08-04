@@ -34,10 +34,13 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    // Record initial learning session for guest/anonymous visitors
+    // Record active learning session immediately
+    const currentUserEmail = authUser?.email || 'english1@simin.hs.kr';
+    const currentUserName = authUser?.displayName || (currentUserEmail.includes('@') ? currentUserEmail.split('@')[0] : '학습자');
+
     recordUserLogin({
-      email: 'guest_student@simin.hs.kr',
-      displayName: '학습자 (2027 심화영어II)',
+      email: currentUserEmail,
+      displayName: currentUserName,
     });
 
     const unsubscribe = subscribeToAuth(async (user) => {
@@ -54,8 +57,19 @@ export default function App() {
       setDeniedReason(null);
       setAuthUser(user);
     });
-    return () => unsubscribe();
-  }, []);
+
+    // 10s Heartbeat Timer to update student online presence and dwell time
+    const heartbeatTimer = setInterval(() => {
+      const activeEmail = authUser?.email || 'english1@simin.hs.kr';
+      const activeName = authUser?.displayName || (activeEmail.includes('@') ? activeEmail.split('@')[0] : '학습자');
+      recordUserLogin({ email: activeEmail, displayName: activeName });
+    }, 10000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(heartbeatTimer);
+    };
+  }, [authUser]);
 
   useEffect(() => {
     if (filterLesson !== 'ALL') {

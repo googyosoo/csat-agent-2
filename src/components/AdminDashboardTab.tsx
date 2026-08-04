@@ -118,20 +118,22 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
     window.open('https://sheets.new', '_blank');
   };
 
-  // Load accumulated real data from Firestore DB (or LocalStorage fallback)
+  // Load accumulated real data from Firestore DB and Server Store
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<string>('초기화 중...');
 
   const loadData = async () => {
     const { students: sList, socraticLogs: socList, learningEvents: evList } = await fetchServerAnalyticsData();
     setStudents(sList);
     setSocSummaries(socList);
     setLearningEvents(evList);
+    setLastSyncTime(new Date().toLocaleTimeString('ko-KR'));
   };
 
   useEffect(() => {
     loadData();
-    const intervalId = setInterval(loadData, 4000);
+    const intervalId = setInterval(loadData, 2000);
     return () => clearInterval(intervalId);
   }, []);
 
@@ -238,17 +240,27 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
           <div>
             <div className="flex items-center space-x-2">
               <h2 className="text-base font-bold text-white">2027 심화영어II 학습자 대시보드 & AI 세특 생성기</h2>
-              <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold rounded-md">
-                FIRESTORE LIVE
+              <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold rounded-md flex items-center space-x-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>실시간 연동 중 ({lastSyncTime})</span>
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              학생별 실시간 학습 데이터 수집 및 800~900바이트 내외 생기부 세특(세부능력 및 특기사항) 자동 생성
+              실제 수강생 수집 실적: <strong className="text-cyan-300 font-mono">{students.length}명</strong> | 학생별 실시간 학습 이력 수집 및 생기부 세특 자동 생성
             </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-2.5 text-xs">
+          {/* Manual Refresh Button */}
+          <button
+            onClick={loadData}
+            className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition-all flex items-center space-x-1.5"
+            title="실시간 학생 이력 데이터 강제 새로고침"
+          >
+            <i className="fa-solid fa-rotate text-cyan-400"></i>
+            <span>동기화</span>
+          </button>
           {/* Google Sheets Sync Button */}
           <button
             onClick={handleOpenGoogleSheetsNew}

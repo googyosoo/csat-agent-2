@@ -1,6 +1,7 @@
 // server.ts
 import express from "express";
 import path from "path";
+import fs from "fs";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
 dotenv.config();
@@ -35,9 +36,37 @@ function validatePassageInput(body, options = {}) {
   }
   return null;
 }
+var ANALYTICS_FILE_PATH = path.join(process.cwd(), "analytics_store.json");
+function loadAnalyticsFromFile() {
+  try {
+    if (fs.existsSync(ANALYTICS_FILE_PATH)) {
+      const raw = fs.readFileSync(ANALYTICS_FILE_PATH, "utf-8");
+      const data = JSON.parse(raw);
+      return {
+        students: Array.isArray(data.students) ? data.students : [],
+        socraticLogs: Array.isArray(data.socraticLogs) ? data.socraticLogs : [],
+        learningEvents: Array.isArray(data.learningEvents) ? data.learningEvents : []
+      };
+    }
+  } catch (e) {
+    console.error("Failed to read analytics file:", e);
+  }
+  return { students: [], socraticLogs: [], learningEvents: [] };
+}
+function saveAnalyticsToFile(data) {
+  try {
+    fs.writeFileSync(ANALYTICS_FILE_PATH, JSON.stringify(data, null, 2), "utf-8");
+  } catch (e) {
+    console.error("Failed to write analytics file:", e);
+  }
+}
+var initialStore = loadAnalyticsFromFile();
 var globalStudentsMap = /* @__PURE__ */ new Map();
-var globalSocraticLogs = [];
-var globalLearningEvents = [];
+initialStore.students.forEach((s) => {
+  if (s && s.email) globalStudentsMap.set(s.email.toLowerCase().trim(), s);
+});
+var globalSocraticLogs = initialStore.socraticLogs;
+var globalLearningEvents = initialStore.learningEvents;
 app.post("/api/analytics/sync", (req, res) => {
   try {
     const { student, socraticLog, learningEvent } = req.body || {};
@@ -48,11 +77,11 @@ app.post("/api/analytics/sync", (req, res) => {
         globalStudentsMap.set(emailKey, {
           ...existing,
           ...student,
-          loginCount: Math.max(existing.loginCount, student.loginCount || 1),
-          totalDwellTimeMinutes: Math.max(existing.totalDwellTimeMinutes, student.totalDwellTimeMinutes || 0),
-          completedPassagesCount: Math.max(existing.completedPassagesCount, student.completedPassagesCount || 0),
-          transformedQuestionsGenerated: Math.max(existing.transformedQuestionsGenerated, student.transformedQuestionsGenerated || 0),
-          socraticQuestionsCount: Math.max(existing.socraticQuestionsCount, student.socraticQuestionsCount || 0),
+          loginCount: Math.max(existing.loginCount || 1, student.loginCount || 1),
+          totalDwellTimeMinutes: Math.max(existing.totalDwellTimeMinutes || 0, student.totalDwellTimeMinutes || 0),
+          completedPassagesCount: Math.max(existing.completedPassagesCount || 0, student.completedPassagesCount || 0),
+          transformedQuestionsGenerated: Math.max(existing.transformedQuestionsGenerated || 0, student.transformedQuestionsGenerated || 0),
+          socraticQuestionsCount: Math.max(existing.socraticQuestionsCount || 0, student.socraticQuestionsCount || 0),
           status: "online",
           lastLogin: student.lastLogin || existing.lastLogin
         });
@@ -70,19 +99,45 @@ app.post("/api/analytics/sync", (req, res) => {
         globalLearningEvents.unshift(learningEvent);
       }
     }
-    return res.json({ success: true, count: globalStudentsMap.size });
+    const studentsArr = Array.from(globalStudentsMap.values());
+    saveAnalyticsToFile({
+      students: studentsArr,
+      socraticLogs: globalSocraticLogs.slice(0, 300),
+      learningEvents: globalLearningEvents.slice(0, 500)
+    });
+    return res.json({ success: true, count: globalStudentsMap.size, students: studentsArr });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 app.get("/api/analytics/data", (req, res) => {
   try {
+    const fileStore = loadAnalyticsFromFile();
+    fileStore.students.forEach((s) => {
+      if (s && s.email) {
+        const key = s.email.toLowerCase().trim();
+        const existing = globalStudentsMap.get(key);
+        if (!existing) {
+          globalStudentsMap.set(key, s);
+        } else {
+          globalStudentsMap.set(key, {
+            ...existing,
+            ...s,
+            loginCount: Math.max(existing.loginCount || 1, s.loginCount || 1),
+            totalDwellTimeMinutes: Math.max(existing.totalDwellTimeMinutes || 0, s.totalDwellTimeMinutes || 0),
+            completedPassagesCount: Math.max(existing.completedPassagesCount || 0, s.completedPassagesCount || 0),
+            transformedQuestionsGenerated: Math.max(existing.transformedQuestionsGenerated || 0, s.transformedQuestionsGenerated || 0),
+            socraticQuestionsCount: Math.max(existing.socraticQuestionsCount || 0, s.socraticQuestionsCount || 0)
+          });
+        }
+      }
+    });
     const students = Array.from(globalStudentsMap.values());
     return res.json({
       success: true,
       students,
-      socraticLogs: globalSocraticLogs,
-      learningEvents: globalLearningEvents
+      socraticLogs: globalSocraticLogs.length > 0 ? globalSocraticLogs : fileStore.socraticLogs,
+      learningEvents: globalLearningEvents.length > 0 ? globalLearningEvents : fileStore.learningEvents
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
