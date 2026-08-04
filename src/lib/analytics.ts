@@ -51,13 +51,13 @@ const DEFAULT_SAMPLE_STUDENTS: StudentActivity[] = [
     email: 'minjun.kim@simin.hs.kr',
     name: '김민준 (3학년 1반)',
     avatarUrl: undefined,
-    loginCount: 5,
+    loginCount: 8,
     lastLogin: new Date().toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
-    totalDwellTimeMinutes: 45,
-    completedPassagesCount: 4,
-    transformedQuestionsGenerated: 6,
-    quizAccuracyPercentage: 85,
-    socraticQuestionsCount: 8,
+    totalDwellTimeMinutes: 52,
+    completedPassagesCount: 5,
+    transformedQuestionsGenerated: 8,
+    quizAccuracyPercentage: 88,
+    socraticQuestionsCount: 9,
     status: 'online',
   },
   {
@@ -65,43 +65,120 @@ const DEFAULT_SAMPLE_STUDENTS: StudentActivity[] = [
     email: 'seoyeon.lee@simin.hs.kr',
     name: '이서연 (3학년 2반)',
     avatarUrl: undefined,
-    loginCount: 3,
-    lastLogin: '2026. 08. 04. 14:20',
-    totalDwellTimeMinutes: 32,
-    completedPassagesCount: 3,
-    transformedQuestionsGenerated: 4,
+    loginCount: 6,
+    lastLogin: '2026. 08. 05. 05:40',
+    totalDwellTimeMinutes: 41,
+    completedPassagesCount: 4,
+    transformedQuestionsGenerated: 6,
     quizAccuracyPercentage: 100,
-    socraticQuestionsCount: 5,
-    status: 'offline',
+    socraticQuestionsCount: 7,
+    status: 'online',
   },
   {
     id: 'std-sample-3',
     email: 'hyunwoo.park@simin.hs.kr',
     name: '박현우 (3학년 1반)',
     avatarUrl: undefined,
+    loginCount: 4,
+    lastLogin: '2026. 08. 05. 04:15',
+    totalDwellTimeMinutes: 28,
+    completedPassagesCount: 3,
+    transformedQuestionsGenerated: 4,
+    quizAccuracyPercentage: 75,
+    socraticQuestionsCount: 4,
+    status: 'offline',
+  },
+  {
+    id: 'std-sample-4',
+    email: 'yujin.choi@simin.hs.kr',
+    name: '최유진 (3학년 3반)',
+    avatarUrl: undefined,
+    loginCount: 5,
+    lastLogin: '2026. 08. 04. 21:10',
+    totalDwellTimeMinutes: 35,
+    completedPassagesCount: 4,
+    transformedQuestionsGenerated: 5,
+    quizAccuracyPercentage: 92,
+    socraticQuestionsCount: 6,
+    status: 'offline',
+  },
+  {
+    id: 'std-sample-5',
+    email: 'suhyeon.jung@simin.hs.kr',
+    name: '정수현 (3학년 2반)',
+    avatarUrl: undefined,
+    loginCount: 3,
+    lastLogin: '2026. 08. 04. 18:30',
+    totalDwellTimeMinutes: 22,
+    completedPassagesCount: 2,
+    transformedQuestionsGenerated: 3,
+    quizAccuracyPercentage: 80,
+    socraticQuestionsCount: 3,
+    status: 'offline',
+  },
+  {
+    id: 'std-sample-6',
+    email: 'donghyun.kang@simin.hs.kr',
+    name: '강동현 (3학년 1반)',
+    avatarUrl: undefined,
     loginCount: 2,
-    lastLogin: '2026. 08. 04. 11:15',
-    totalDwellTimeMinutes: 20,
+    lastLogin: '2026. 08. 04. 15:05',
+    totalDwellTimeMinutes: 18,
     completedPassagesCount: 2,
     transformedQuestionsGenerated: 2,
-    quizAccuracyPercentage: 75,
-    socraticQuestionsCount: 3,
+    quizAccuracyPercentage: 70,
+    socraticQuestionsCount: 2,
     status: 'offline',
   },
 ];
 
 /**
- * Get stored student activities from localStorage (or Firestore fallback)
+ * Get stored student activities from localStorage merged with roster
  */
 export function getStoredStudentActivities(): StudentActivity[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_STUDENTS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(DEFAULT_SAMPLE_STUDENTS));
-      return DEFAULT_SAMPLE_STUDENTS;
+    let currentStored: StudentActivity[] = [];
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) currentStored = parsed;
+      } catch (e) {}
     }
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_SAMPLE_STUDENTS;
+
+    // Merge stored active students with base student roster so ALL students remain visible
+    const mergedMap = new Map<string, StudentActivity>();
+
+    // First populate base roster
+    DEFAULT_SAMPLE_STUDENTS.forEach((std) => {
+      mergedMap.set(std.email.toLowerCase(), std);
+    });
+
+    // Then layer stored activity over base roster
+    currentStored.forEach((std) => {
+      if (std && std.email) {
+        const key = std.email.toLowerCase();
+        const existing = mergedMap.get(key);
+        if (existing) {
+          mergedMap.set(key, {
+            ...existing,
+            ...std,
+            // Keep highest stats if updated
+            loginCount: Math.max(existing.loginCount, std.loginCount || 1),
+            totalDwellTimeMinutes: Math.max(existing.totalDwellTimeMinutes, std.totalDwellTimeMinutes || 0),
+            completedPassagesCount: Math.max(existing.completedPassagesCount, std.completedPassagesCount || 0),
+            transformedQuestionsGenerated: Math.max(existing.transformedQuestionsGenerated, std.transformedQuestionsGenerated || 0),
+            socraticQuestionsCount: Math.max(existing.socraticQuestionsCount, std.socraticQuestionsCount || 0),
+          });
+        } else {
+          mergedMap.set(key, std);
+        }
+      }
+    });
+
+    const result = Array.from(mergedMap.values());
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(result));
+    return result;
   } catch {
     return DEFAULT_SAMPLE_STUDENTS;
   }
