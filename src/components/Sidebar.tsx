@@ -140,6 +140,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>어휘 & 구문 보관함</span>
           </button>
 
+          {/* Student My Dashboard Navigation */}
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); handleTabSelect('student-dashboard'); }}
+            className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-bold transition-all border border-blue-500/30 ${
+              activeTab === 'student-dashboard'
+                ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-950/50'
+                : 'text-blue-300 hover:bg-blue-950/40 hover:text-blue-200'
+            }`}
+          >
+            <i className="fa-solid fa-user-gear w-5 text-center text-cyan-400"></i>
+            <span>마이 학습 대시보드</span>
+          </button>
+
           {/* Admin Dashboard Navigation */}
           {isAdmin && (
             <button

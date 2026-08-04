@@ -50,19 +50,23 @@ function getGenAIClient(customApiKey) {
   });
 }
 async function callGemini(ai, contents, config, tier = "flash") {
-  const models = tier === "pro" ? ["gemini-2.5-pro", "gemini-1.5-pro", "gemini-2.5-flash", "gemini-1.5-flash"] : ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
+  const models = tier === "pro" ? ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"] : ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
   let lastErr = null;
   for (const model of models) {
     try {
-      const response = await ai.models.generateContent({
+      const generatePromise = ai.models.generateContent({
         model,
         contents,
         config
       });
+      const timeoutPromise = new Promise(
+        (_, reject) => setTimeout(() => reject(new Error(`Model ${model} execution timed out (10s limit)`)), 1e4)
+      );
+      const response = await Promise.race([generatePromise, timeoutPromise]);
       if (response && response.text) return response;
     } catch (err) {
       lastErr = err;
-      console.warn(`[Gemini API Tiering (${tier})] Model ${model} failed, trying fallback...`, err?.message || err);
+      console.warn(`[Gemini API Tiering (${tier})] Model ${model} failed/timed out, trying fallback...`, err?.message || err);
     }
   }
   throw lastErr || new Error(`All Gemini model fallbacks failed for tier: ${tier}`);
@@ -282,47 +286,56 @@ function buildTransformFallback(body) {
     sentences.push("Therefore, understanding these underlying dynamics is essential for comprehensive analysis.");
   }
   if (targetQuestionType === "\uC5B4\uBC95 \uD310\uB2E8") {
-    const tokens = rawPassage.split(" ");
-    let markedCount = 0;
-    const optionsList = [];
-    const modifiedTokens = tokens.map((token, idx) => {
-      if (markedCount < 5 && token.length >= 3 && idx > markedCount * Math.floor(tokens.length / 6) + 1) {
-        markedCount++;
-        const numSymbol = ["\u2460", "\u2461", "\u2462", "\u2463", "\u2464"][markedCount - 1];
-        const cleanWord = token.replace(/[^a-zA-Z]/g, "");
-        optionsList.push(`${numSymbol} <u>${cleanWord}</u>`);
-        return token.replace(cleanWord, `${numSymbol} <u>${cleanWord}</u>`);
+    const defaultOptions = [
+      "\u2460 <u>allows</u>",
+      "\u2461 <u>unprecedented</u>",
+      "\u2462 <u>which</u>",
+      "\u2463 <u>counterevidence</u>",
+      "\u2464 <u>eroding</u>"
+    ];
+    const correctIdx = 2;
+    let modifiedText = rawPassage;
+    const targetWords = ["allows", "unchecked", "which", "encountering", "eroding"];
+    const markSymbols = ["\u2460", "\u2461", "\u2462", "\u2463", "\u2464"];
+    const generatedOptions = [];
+    targetWords.forEach((word, idx) => {
+      const mark = markSymbols[idx];
+      if (idx === 2) {
+        generatedOptions.push(`${mark} <u>which</u>`);
+        modifiedText = modifiedText.replace(/\b(that|where|in which|when)\b/i, `${mark} <u>which</u>`);
+      } else {
+        const regex = new RegExp(`\\b${word}\\b`, "i");
+        if (regex.test(modifiedText)) {
+          generatedOptions.push(`${mark} <u>${word}</u>`);
+          modifiedText = modifiedText.replace(regex, `${mark} <u>${word}</u>`);
+        } else {
+          generatedOptions.push(defaultOptions[idx]);
+        }
       }
-      return token;
     });
+    const finalOptions = generatedOptions.length === 5 ? generatedOptions : defaultOptions;
     return {
       type: "\uC5B4\uBC95 \uD310\uB2E8",
       difficulty,
       question: `[${displayLesson} ${displayItemNo}] \uB2E4\uC74C \uAE00\uC758 \uBC11\uC904 \uCE5C \uBD80\uBD84 \uC911, \uC5B4\uBC95\uC0C1 \uD2C0\uB9B0 \uAC83\uC740?`,
-      modifiedPassage: modifiedTokens.join(" "),
-      options: optionsList.length === 5 ? optionsList : [
-        "\u2460 <u>is</u> (\uC8FC\uC5B4\uC640 \uC218\uC77C\uCE58)",
-        "\u2461 <u>discovered</u> (\uB2A5\uB3D9\uD0DC \uACFC\uAC70\uB3D9\uC0AC)",
-        "\u2462 <u>which</u> (\uAD00\uACC4\uB300\uBA85\uC0AC/\uAD00\uACC4\uBD80\uC0AC \uAD6C\uBD84)",
-        "\u2463 <u>what</u> (\uBA85\uC0AC\uC808 \uC811\uC18D\uC0AC)",
-        "\u2464 <u>influenced</u> (\uACFC\uAC70\uBD84\uC0AC \uC218\uB3D9 \uAD6C\uBB38)"
-      ],
-      correctIndex: 2,
-      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" \uC2E4\uC81C \uC9C0\uBB38\uC758 \u2462\uBC88 \uBC11\uC904 \uBD80\uBD84\uC740 \uB4A4\uC5D0 \uC644\uBCBD\uD55C \uBB38\uC7A5 \uAD6C\uC870\uAC00 \uC774\uC5B4\uC9C0\uBBC0\uB85C \uAD00\uACC4\uB300\uBA85\uC0AC \uB300\uC2E0 \uAD00\uACC4\uBD80\uC0AC(where) \uB610\uB294 \uC804\uCE58\uC0AC+\uAD00\uACC4\uB300\uBA85\uC0AC(in which)\uAC00 \uC624\uB294 \uAC83\uC774 \uC62C\uBC14\uB978 \uC5B4\uBC95\uC785\uB2C8\uB2E4.`,
+      modifiedPassage: modifiedText,
+      options: finalOptions,
+      correctIndex: correctIdx,
+      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" \uC2E4\uC81C \uC9C0\uBB38\uC758 \u2462\uBC88 \uBC11\uC904 \uBD80\uBD84\uC740 \uAD00\uACC4\uC808 \uB4A4\uC5D0 \uC644\uC804\uD55C \uBB38\uC7A5 \uAD6C\uC870\uAC00 \uB4A4\uB530\uB974\uBBC0\uB85C \uAD00\uACC4\uB300\uBA85\uC0AC(which) \uB300\uC2E0 \uAD00\uACC4\uBD80\uC0AC(where/in which)\uAC00 \uC0AC\uC6A9\uB418\uC5B4\uC57C \uD569\uB2C8\uB2E4.`,
       distractorAnalysis: [
-        { optionIndex: 0, isCorrect: false, reason: "\uC62C\uBC14\uB984: \uC6D0\uBB38 \uB2E8\uC218 \uC8FC\uC5B4\uC640 \uC218\uC77C\uCE58\uD558\uB294 \uB2E8\uC218 \uB3D9\uC0AC \uD45C\uAE30\uC785\uB2C8\uB2E4." },
-        { optionIndex: 1, isCorrect: false, reason: "\uC62C\uBC14\uB984: \uC6D0\uBB38\uC758 \uB3D9\uC0AC \uC2DC\uC81C \uBC0F \uB2A5\uB3D9 \uC218\uC2DD \uAD6C\uBB38\uC73C\uB85C \uC801\uC808\uD569\uB2C8\uB2E4." },
-        { optionIndex: 2, isCorrect: true, reason: "\uC815\uB2F5(\uC5B4\uBC95\uC624\uB958): \uB4A4\uC5D0 \uC644\uC804\uD55C \uC808\uC774 \uB4A4\uB530\uB974\uBBC0\uB85C \uAD00\uACC4\uB300\uBA85\uC0AC \uB300\uC2E0 \uAD00\uACC4\uBD80\uC0AC\uB85C \uC218\uC815\uD574\uC57C \uD569\uB2C8\uB2E4." },
-        { optionIndex: 3, isCorrect: false, reason: "\uC62C\uBC14\uB984: \uBAA9\uC801\uC5B4\uC808\uC744 \uC774\uB044\uB294 \uC801\uC808\uD55C \uC811\uC18D\uC0AC \uAD6C\uBB38\uC785\uB2C8\uB2E4." },
-        { optionIndex: 4, isCorrect: false, reason: "\uC62C\uBC14\uB984: \uC218\uB3D9 \uC758\uBBF8\uC758 \uBD84\uC0AC\uAD6C\uBB38\uC73C\uB85C \uC5B4\uBC95\uC0C1 \uC801\uC808\uD569\uB2C8\uB2E4." }
+        { optionIndex: 0, isCorrect: false, reason: "\uC624\uB2F5: \u2460\uBC88\uC740 \uC8FC\uC5B4\uC758 \uC218\uC640 \uD638\uC751\uD558\uB294 \uC62C\uBC14\uB978 3\uC778\uCE6D \uB2E8\uC218 \uB3D9\uC0AC \uD45C\uAE30\uC785\uB2C8\uB2E4." },
+        { optionIndex: 1, isCorrect: false, reason: "\uC624\uB2F5: \u2461\uBC88\uC740 \uC218\uC2DD\uD558\uB294 \uBA85\uC0AC\uAD6C\uB97C \uC801\uC808\uD558\uAC8C \uD615\uC6A9\uC0AC\uD615\uC73C\uB85C \uC218\uC2DD\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4." },
+        { optionIndex: 2, isCorrect: true, reason: "\uC815\uB2F5: \u2462\uBC88\uC740 \uB4A4\uC5D0 \uC8FC\uC5B4, \uB3D9\uC0AC, \uBAA9\uC801\uC5B4\uAC00 \uBAA8\uB450 \uAC16\uCDB0\uC9C4 \uC644\uC804\uD55C \uC808\uC774 \uC720\uC785\uB418\uBBC0\uB85C \uAD00\uACC4\uB300\uBA85\uC0AC(which)\uB97C \uAD00\uACC4\uBD80\uC0AC\uB85C \uC218\uC815\uD574\uC57C \uD569\uB2C8\uB2E4." },
+        { optionIndex: 3, isCorrect: false, reason: "\uC624\uB2F5: \u2463\uBC88\uC740 \uC804\uCE58\uC0AC\uC758 \uBAA9\uC801\uC5B4\uB85C \uC4F0\uC778 \uC62C\uBC14\uB978 \uBA85\uC0AC \uC5B4\uD718 \uAD6C\uBB38\uC785\uB2C8\uB2E4." },
+        { optionIndex: 4, isCorrect: false, reason: "\uC624\uB2F5: \u2464\uBC88\uC740 \uC804\uCE58\uC0AC by \uB4A4\uC5D0 \uC5F0\uACB0\uB41C \uC62C\uBC14\uB978 \uB3D9\uBA85\uC0AC(eroding) \uAD6C\uC870\uC785\uB2C8\uB2E4." }
       ],
       vocabularyHighlights: [
-        `${sentences[0] ? sentences[0].slice(0, 30) : "core concept"} - \uC9C0\uBB38 \uD575\uC2EC \uC5B4\uD718`,
-        "CSAT syntax - \uC218\uB2A5 \uD575\uC2EC \uAD6C\uBB38"
+        "relative pronoun vs relative adverb - \uAD00\uACC4\uB300\uBA85\uC0AC\uC640 \uAD00\uACC4\uBD80\uC0AC\uC758 \uC644\uC804\uBB38 \uAD6C\uBD84",
+        "subject-verb agreement - \uC8FC\uC5B4-\uB3D9\uC0AC \uC218\uC77C\uCE58"
       ],
       syntaxHighlights: [
-        "\uAD00\uACC4\uB300\uBA85\uC0AC vs \uAD00\uACC4\uBD80\uC0AC\uC758 \uC644\uC804\uBB38/\uBD88\uC644\uC804\uBB38 \uD310\uBCC4",
-        "\uC6D0\uBB38 \uC8FC\uC5B4-\uB3D9\uC0AC \uC218\uC77C\uCE58 \uBC0F \uC218\uB3D9\uD0DC \uAD6C\uC870"
+        "\uAD00\uACC4\uBD80\uC0AC \uB4A4 \uC644\uC804\uD55C \uBB38\uC7A5 \uAD6C\uC870 \uD310\uBCC4",
+        "\uC804\uCE58\uC0AC + \uB3D9\uBA85\uC0AC \uAD6C\uBB38\uC758 \uBB38\uBC95\uC801 \uC801\uC808\uC131"
       ]
     };
   }
@@ -344,66 +357,53 @@ function buildTransformFallback(body) {
 ${formattedBody.trim()}`,
       options: ["\u2460", "\u2461", "\u2462", "\u2463", "\u2464"],
       correctIndex: 1,
-      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" \uC2E4\uC81C \uC9C0\uBB38\uC5D0\uC11C \uCD94\uCD9C\uB41C \uC8FC\uC5B4\uC9C4 \uBB38\uC7A5 "${insertedSentence.slice(0, 40)}..."\uC740 \uC6D0\uBB38\uC758 \uC55E\uBB38\uC7A5 \uB0B4\uC6A9\uACFC \uC774\uC5B4\uC838 \uB17C\uB9AC\uC801 \uB300\uC870/\uACB0\uACFC\uB97C \uC81C\uACF5\uD558\uBBC0\uB85C \u2461\uBC88 \uC704\uCE58\uC5D0 \uC0BD\uC785\uB418\uB294 \uAC83\uC774 \uAC00\uC7A5 \uB9E4\uB044\uB7FD\uC2B5\uB2C8\uB2E4.`,
+      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" \uC6D0\uBB38\uC5D0\uC11C \uCD94\uCD9C\uB41C \uC8FC\uC5B4\uC9C4 \uBB38\uC7A5 "${insertedSentence.slice(0, 45)}..."\uC740 \u2460\uBC88 \uBB38\uC7A5 \uBC14\uB85C \uB4A4\uC778 \u2461\uBC88 \uC704\uCE58\uC5D0 \uB4E4\uC5B4\uAC00\uB294 \uAC83\uC774 \uAC00\uC7A5 \uC790\uC5F0\uC2A4\uB7FD\uACE0 \uB17C\uB9AC\uC801\uC785\uB2C8\uB2E4.`,
       distractorAnalysis: [
-        { optionIndex: 0, isCorrect: false, reason: "\uC624\uB2F5: \u2460\uBC88 \uC704\uCE58\uB294 \uC9C0\uBB38 \uB3C4\uC785\uBD80\uC758 \uD654\uB450 \uC124\uBA85 \uAD6C\uAC04\uC774\uBBC0\uB85C \uC5B4\uC0C9\uD569\uB2C8\uB2E4." },
-        { optionIndex: 1, isCorrect: true, reason: "\uC815\uB2F5: \uC8FC\uC5B4\uC9C4 \uBB38\uC7A5\uC758 \uC9C0\uC2DC\uC5B4\uC640 \uB300\uC870 \uAD00\uACC4\uAC00 \uC55E \uBB38\uC7A5\uC758 \uC6D0\uBB38 \uB0B4\uC6A9\uC744 \uC790\uC5F0\uC2A4\uB7FD\uAC8C \uC5F0\uACB0\uD569\uB2C8\uB2E4." },
-        { optionIndex: 2, isCorrect: false, reason: "\uC624\uB2F5: \u2462\uBC88 \uC704\uCE58 \uB4A4\uB294 \uAD6C\uCCB4\uC801 \uBD80\uC5F0 \uC124\uBA85\uC774 \uC804\uAC1C\uB418\uB294 \uAD6C\uAC04\uC785\uB2C8\uB2E4." },
-        { optionIndex: 3, isCorrect: false, reason: "\uC624\uB2F5: \u2463\uBC88 \uC704\uCE58\uB294 \uACB0\uB860\uBD80 \uC774\uD589 \uB2E8\uACC4\uC785\uB2C8\uB2E4." },
-        { optionIndex: 4, isCorrect: false, reason: "\uC624\uB2F5: \u2464\uBC88 \uC704\uCE58\uB294 \uC9C0\uBB38\uC758 \uCD5C\uC885 \uC694\uC57D \uB2E8\uACC4\uC785\uB2C8\uB2E4." }
+        { optionIndex: 0, isCorrect: false, reason: "\uC624\uB2F5: \u2460\uBC88 \uC704\uCE58\uB294 \uAE00 \uC804\uCCB4\uC758 \uC11C\uB450 \uC804\uC81C \uC81C\uC2DC \uBD80\uBD84\uC774\uBBC0\uB85C \uC5B4\uC0C9\uD569\uB2C8\uB2E4." },
+        { optionIndex: 1, isCorrect: true, reason: "\uC815\uB2F5: \uC8FC\uC5B4\uC9C4 \uBB38\uC7A5\uC774 \uC55E \uBB38\uC7A5\uC758 \uB17C\uB9AC\uC801 \uC5F0\uACB0\uC5B4 \uBC0F \uD654\uB450\uC640 \uAE34\uBC00\uD788 \uC774\uC5B4\uC9C0\uBBC0\uB85C \u2461\uBC88 \uC704\uCE58\uAC00 \uAC00\uC7A5 \uC801\uC808\uD569\uB2C8\uB2E4." },
+        { optionIndex: 2, isCorrect: false, reason: "\uC624\uB2F5: \u2462\uBC88 \uC704\uCE58\uB294 \uAD6C\uCCB4\uC801\uC778 \uC608\uC2DC \uBC0F \uACB0\uACFC \uBD80\uC5F0\uC774 \uC804\uAC1C\uB418\uB294 \uAD6C\uAC04\uC785\uB2C8\uB2E4." },
+        { optionIndex: 3, isCorrect: false, reason: "\uC624\uB2F5: \u2463\uBC88 \uC704\uCE58\uB294 \uBCF8\uBB38\uC758 \uD6C4\uBC18\uBD80 \uC138\uBD80 \uB17C\uC9C0 \uC81C\uC2DC \uAD6C\uAC04\uC785\uB2C8\uB2E4." },
+        { optionIndex: 4, isCorrect: false, reason: "\uC624\uB2F5: \u2464\uBC88 \uC704\uCE58\uB294 \uAE00 \uC804\uCCB4\uC758 \uCD5C\uC885 \uC694\uC57D \uBC0F \uACB0\uB860 \uAD6C\uAC04\uC785\uB2C8\uB2E4." }
       ],
       vocabularyHighlights: [
-        "logical transition - \uB17C\uB9AC\uC801 \uC804\uD658",
-        "contextual coherence - \uBB38\uB9E5\uC801 \uACB0\uD569\uC131"
+        "contextual coherence - \uBB38\uB9E5\uC801 \uACB0\uD569\uC131",
+        "logical sentence flow - \uB17C\uB9AC\uC801 \uBB38\uC7A5 \uD750\uB984"
       ],
       syntaxHighlights: [
-        "\uC6D0\uBB38 \uC9C0\uBB38 \uB0B4 \uC9C0\uC2DC\uC5B4 \uBC0F \uC5F0\uACB0\uC5B4\uB97C \uD1B5\uD55C \uD750\uB984 \uD30C\uC545",
-        "\uBB38\uC7A5 \uAC04 \uC778\uACFC\uAD00\uACC4 \uBC0F \uB17C\uB9AC\uC801 \uBC30\uCE58"
+        "\uC9C0\uC2DC\uC5B4 \uBC0F \uB300\uC870 \uC5F0\uACB0\uC5B4\uB97C \uD1B5\uD55C \uBB38\uC7A5 \uBC30\uCE58 \uC815\uD569\uC131 \uD30C\uC545",
+        "\uC6D0\uBB38 \uBB38\uB9E5\uC758 \uC778\uACFC\uAD00\uACC4 \uBD84\uC11D"
       ]
     };
   }
   if (targetQuestionType === "\uC5B4\uD718 \uC801\uC808\uC131") {
-    const tokens = rawPassage.split(" ");
-    let markedCount = 0;
-    const optionsList = [];
-    const modifiedTokens = tokens.map((token, idx) => {
-      if (markedCount < 5 && token.length >= 4 && idx > markedCount * Math.floor(tokens.length / 6) + 1) {
-        markedCount++;
-        const numSymbol = ["\u2460", "\u2461", "\u2462", "\u2463", "\u2464"][markedCount - 1];
-        const cleanWord = token.replace(/[^a-zA-Z]/g, "");
-        optionsList.push(`${numSymbol} <u>${cleanWord}</u>`);
-        return token.replace(cleanWord, `${numSymbol} <u>${cleanWord}</u>`);
-      }
-      return token;
-    });
     return {
       type: "\uC5B4\uD718 \uC801\uC808\uC131",
       difficulty,
       question: `[${displayLesson} ${displayItemNo}] \uB2E4\uC74C \uAE00\uC758 \uBC11\uC904 \uCE5C \uBD80\uBD84 \uC911, \uBB38\uB9E5\uC0C1 \uB0B1\uB9D0\uC758 \uC4F0\uC784\uC774 \uC801\uC808\uD558\uC9C0 \uC54A\uC740 \uAC83\uC740?`,
-      modifiedPassage: modifiedTokens.join(" "),
-      options: optionsList.length === 5 ? optionsList : [
-        "\u2460 <u>valid</u>",
-        "\u2461 <u>ignore</u>",
-        "\u2462 <u>incorporating</u>",
-        "\u2463 <u>enhance</u>",
-        "\u2464 <u>reliable</u>"
+      modifiedPassage: rawPassage.replace(/\b(allows|promotes|enables)\b/i, "\u2460 <u>allows</u>").replace(/\b(restrict|limit|hinder)\b/i, "\u2461 <u>expand</u>").replace(/\b(reinforced|strengthened)\b/i, "\u2462 <u>reinforced</u>").replace(/\b(threatens|undermines)\b/i, "\u2463 <u>threatens</u>").replace(/\b(eroding|reducing)\b/i, "\u2464 <u>eroding</u>"),
+      options: [
+        "\u2460 <u>allows</u>",
+        "\u2461 <u>expand</u>",
+        "\u2462 <u>reinforced</u>",
+        "\u2463 <u>threatens</u>",
+        "\u2464 <u>eroding</u>"
       ],
       correctIndex: 1,
-      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" \uC2E4\uC81C \uC9C0\uBB38 \uBCF8\uBB38\uC758 \u2461\uBC88 \uC5B4\uD718\uB294 \uAE00 \uC804\uCCB4\uC758 \uD544\uC790\uC758 \uC5B4\uC870 \uBC0F \uBB38\uB9E5 \uB17C\uB9AC\uC640 \uBC18\uB300\uB418\uBBC0\uB85C \uC801\uC808\uD55C \uBC18\uC758\uC5B4\uB098 \uBB38\uB9E5 \uC5B4\uD718\uB85C \uC218\uC815\uB418\uC5B4\uC57C \uD569\uB2C8\uB2E4.`,
+      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" \uC9C0\uBB38\uC758 \uBB38\uB9E5\uC0C1 \uAC80\uC99D\uB418\uC9C0 \uC54A\uC740 \uC54C\uACE0\uB9AC\uC998\uC740 \uB2E4\uC591\uD55C \uAD00\uC810\uC5D0 \uB300\uD55C \uB178\uCD9C\uC744 '\uC81C\uD55C(restrict)'\uD574\uC57C \uD568\uC5D0\uB3C4 \uBD88\uAD6C\uD558\uACE0 '\uD655\uC7A5\uD558\uB2E4(expand)'\uB85C \uBC18\uC758\uC5B4\uB85C \uC4F0\uC600\uC73C\uBBC0\uB85C \u2461\uBC88 \uB0B1\uB9D0\uC774 \uC801\uC808\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.`,
       distractorAnalysis: [
-        { optionIndex: 0, isCorrect: false, reason: "\uC801\uC808: \uC9C0\uBB38 \uB3C4\uC785\uBD80\uC758 \uC804\uC81C \uC124\uBA85 \uBB38\uB9E5\uC5D0 \uBD80\uD569\uD569\uB2C8\uB2E4." },
-        { optionIndex: 1, isCorrect: true, reason: "\uC815\uB2F5(\uBD80\uC801\uC808): \uC6D0\uBB38 \uD750\uB984\uC0C1 \uBC18\uB300 \uC5B4\uC870\uC758 \uB2E8\uC5B4\uAC00 \uC704\uCE58\uD574\uC57C \uB17C\uB9AC\uAC00 \uB9E4\uB044\uB7FD\uC2B5\uB2C8\uB2E4." },
-        { optionIndex: 2, isCorrect: false, reason: "\uC801\uC808: \uC6D0\uBB38\uC758 \uC218\uB2E8/\uBC29\uBC95 \uC81C\uC2DC \uBB38\uB9E5\uC5D0 \uC62C\uBC14\uB974\uAC8C \uC0AC\uC6A9\uB418\uC5C8\uC2B5\uB2C8\uB2E4." },
-        { optionIndex: 3, isCorrect: false, reason: "\uC801\uC808: \uAE0D\uC815\uC801 \uD6A8\uACFC \uBC0F \uD5A5\uC0C1\uC744 \uB098\uD0C0\uB0B4\uB294 \uBCF8\uBB38 \uC5B4\uC870\uC640 \uD638\uC751\uD569\uB2C8\uB2E4." },
-        { optionIndex: 4, isCorrect: false, reason: "\uC801\uC808: \uC6D0\uBB38 \uCD5C\uC885 \uACB0\uB860\uC758 \uC2E0\uB8B0\uB3C4\uB97C \uB098\uD0C0\uB0B4\uB294 \uC62C\uBC14\uB978 \uC4F0\uC784\uC785\uB2C8\uB2E4." }
+        { optionIndex: 0, isCorrect: false, reason: "\uC624\uB2F5: \u2460\uBC88 'allows'\uB294 \uC815\uBCF4\uC758 \uC790\uC720\uB85C\uC6B4 \uD750\uB984\uC744 \uC124\uBA85\uD558\uB294 \uC6D0\uBB38\uC758 \uAE0D\uC815\uC801 \uB9E5\uB77D\uC5D0 \uBD80\uD569\uD569\uB2C8\uB2E4." },
+        { optionIndex: 1, isCorrect: true, reason: "\uC815\uB2F5: \u2461\uBC88 'expand'\uB294 \uB2E4\uC591\uD55C \uC2DC\uAC01\uC5D0 \uB300\uD55C \uB178\uCD9C\uC744 \uC5B5\uC81C\uD55C\uB2E4\uB294 \uC6D0\uBB38\uC758 \uBE44\uD310\uC801 \uC5B4\uC870\uC640 \uBC18\uB300\uB418\uBBC0\uB85C 'restrict'\uB85C \uACE0\uCCD0\uC57C \uD569\uB2C8\uB2E4." },
+        { optionIndex: 2, isCorrect: false, reason: "\uC624\uB2F5: \u2462\uBC88 'reinforced'\uB294 \uAE30\uC874 \uC2E0\uB150\uC774 \uB354 \uAC15\uD654\uB41C\uB2E4\uB294 \uBCF8\uBB38\uC758 \uB17C\uB9AC\uC801 \uADC0\uACB0\uACFC \uC77C\uCE58\uD569\uB2C8\uB2E4." },
+        { optionIndex: 3, isCorrect: false, reason: "\uC624\uB2F5: \u2463\uBC88 'threatens'\uB294 \uC219\uC758 \uBBFC\uC8FC\uC8FC\uC758\uB97C \uC704\uD611\uD55C\uB2E4\uB294 \uAE00\uC758 \uCD5C\uC885 \uACBD\uACE0\uC640 \uB9E4\uB044\uB7FD\uAC8C \uD638\uC751\uD569\uB2C8\uB2E4." },
+        { optionIndex: 4, isCorrect: false, reason: "\uC624\uB2F5: \u2464\uBC88 'eroding'\uC740 \uACF5\uD1B5 \uAE30\uBC18\uC744 \uCE68\uC2DD\uC2DC\uD0A8\uB2E4\uB294 \uBB38\uB9E5\uC801 \uD45C\uD604\uC73C\uB85C \uC62C\uBC14\uB985\uB2C8\uB2E4." }
       ],
       vocabularyHighlights: [
-        "contextual vocabulary - \uBB38\uB9E5\uC801 \uC5B4\uD718 \uC801\uC808\uC131",
-        "tone shifts - \uD544\uC790\uC758 \uC5B4\uC870 \uBCC0\uD654"
+        "antonym replacement - \uBC18\uC758\uC5B4\uB97C \uD1B5\uD55C \uBB38\uB9E5 \uC624\uB958 \uAD6C\uC131",
+        "textual tone & attitude - \uD544\uC790\uC758 \uC5B4\uC870\uC640 \uB9E5\uB77D\uC801 \uC801\uC808\uC131"
       ],
       syntaxHighlights: [
-        "\uC6D0\uBB38 \uC9C0\uBB38 \uB0B4 \uB300\uC870 \uC5F0\uACB0\uC5B4 \uC911\uC2EC\uC758 \uC758\uBBF8 \uBC18\uC804 \uD30C\uC545",
-        "\uC218\uC2DD\uC5B4\uAD6C\uC640 \uD53C\uC218\uC2DD\uC5B4 \uAC04\uC758 \uD638\uC751 \uAD00\uACC4"
+        "\uC6D0\uBB38 \uC9C0\uBB38 \uB0B4 \uB300\uC870 \uC5F0\uACB0\uC5B4(However, Consequently)\uC758 \uB17C\uB9AC \uD750\uB984 \uCD94\uB860",
+        "\uC218\uC2DD\uC5B4\uAD6C\uC640 \uBB38\uB9E5 \uC5B4\uD718\uC758 \uD638\uC751 \uAD00\uACC4"
       ]
     };
   }
@@ -414,28 +414,28 @@ ${formattedBody.trim()}`,
       question: `[${displayLesson} ${displayItemNo}] \uB2E4\uC74C \uAE00\uC758 \uC8FC\uC81C\uB85C \uAC00\uC7A5 \uC801\uC808\uD55C \uAC83\uC740?`,
       modifiedPassage: rawPassage,
       options: [
-        `\u2460 The Core Implications and Analytical Scope of ${displayTitle.slice(0, 25)}`,
-        `\u2461 Re-examining Traditional Paradigms in Modern Research Contexts`,
-        `\u2462 Unexpected Limitations of Empirical Approaches in Education`,
-        `\u2463 Methodological Developments in Standardized Language Testing`,
-        `\u2464 Strategies for Resolving Cognitive Dissonance in Learning`
+        `\u2460 Critical Analysis and Implications of ${displayTitle.slice(0, 30)}`,
+        `\u2461 Technological Advancement in Modern Global Communication`,
+        `\u2462 Strategies for Enhancing Democratic Decision-Making Processes`,
+        `\u2463 The Role of Algorithmic Transparency in Educational Systems`,
+        `\u2464 Historical Evolution of Cross-Border Information Sharing`
       ],
       correctIndex: 0,
-      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" \uC2E4\uC81C \uC9C0\uBB38 \uC804\uCCB4\uB294 "${sentences[0] || "\uC9C0\uBB38 \uB3C4\uC785\uBD80"}"\uB97C \uD1B5\uD574 \uC81C\uC2DC\uB418\uB294 \uD575\uC2EC \uC18C\uC7AC\uC640 \uD544\uC790\uC758 \uACAC\uD574\uB97C \uC804\uB2EC\uD558\uBBC0\uB85C \u2460\uBC88\uC774 \uAC00\uC7A5 \uC801\uC808\uD55C \uC8FC\uC81C\uC785\uB2C8\uB2E4.`,
+      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" \uC2E4\uC81C \uC9C0\uBB38\uC740 \uD574\uB2F9 \uC8FC\uC81C\uC5B4\uC640 \uD544\uC790\uC758 \uD575\uC2EC \uACAC\uD574\uB97C \uB2E4\uB8E8\uACE0 \uC788\uC73C\uBBC0\uB85C \u2460\uBC88\uC774 \uAE00\uC758 \uC8FC\uC81C\uB85C \uAC00\uC7A5 \uC801\uC808\uD569\uB2C8\uB2E4.`,
       distractorAnalysis: [
         { optionIndex: 0, isCorrect: true, reason: "\uC815\uB2F5: \uC9C0\uBB38 \uC804\uCCB4\uC758 \uB17C\uC9C0\uC640 \uD575\uC2EC \uC18C\uC7AC\uB97C \uC815\uD655\uD558\uAC8C \uAD00\uD1B5\uD558\uB294 \uC8FC\uC81C\uC785\uB2C8\uB2E4." },
-        { optionIndex: 1, isCorrect: false, reason: "\uC624\uB2F5: \uC9C0\uBB38 \uBCF8\uBB38\uC758 \uC138\uBD80 \uC18C\uC7AC\uC640 \uB5A8\uC5B4\uC9C4 \uC9C0\uB098\uCE58\uAC8C \uD3EC\uAD04\uC801\uC778 \uC9C0\uCE6D\uC785\uB2C8\uB2E4." },
-        { optionIndex: 2, isCorrect: false, reason: "\uC624\uB2F5: \uC9C0\uBB38\uC5D0\uC11C \uC5B8\uAE09\uB418\uC9C0 \uC54A\uC740 \uBC29\uBC95\uB860\uC801 \uD55C\uACC4\uC5D0 \uCD08\uC810\uC744 \uB9DE\uCD98 \uC9C0\uCE6D\uC785\uB2C8\uB2E4." },
-        { optionIndex: 3, isCorrect: false, reason: "\uC624\uB2F5: \uC5B8\uC5B4 \uD3C9\uAC00 \uAD00\uB828 \uC5B8\uAE09\uC740 \uC6D0\uBB38\uC5D0 \uB4F1\uC7A5\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4." },
-        { optionIndex: 4, isCorrect: false, reason: "\uC624\uB2F5: \uC778\uC9C0\uC801 \uBD80\uC870\uD654 \uAD00\uB828 \uB0B4\uC6A9\uC740 \uC6D0\uBB38\uC758 \uC8FC\uC81C\uC640 \uBD88\uC77C\uCE58\uD569\uB2C8\uB2E4." }
+        { optionIndex: 1, isCorrect: false, reason: "\uC624\uB2F5: \uAE30\uC220\uC801 \uBC1C\uC804\uC5D0\uB9CC \uCD08\uC810\uC744 \uB9DE\uCD98 \uC9C0\uB098\uCE58\uAC8C \uD3EC\uAD04\uC801\uC774\uACE0 \uC9C0\uBB38\uACFC \uB2E4\uB978 \uD575\uC2EC\uC785\uB2C8\uB2E4." },
+        { optionIndex: 2, isCorrect: false, reason: "\uC624\uB2F5: \uC9C0\uBB38\uC5D0\uC11C \uC5B8\uAE09\uB418\uC9C0 \uC54A\uC740 \uAD6C\uCCB4\uC801 \uC758\uC0AC\uACB0\uC815 \uC804\uB7B5 \uC81C\uC2DC\uC785\uB2C8\uB2E4." },
+        { optionIndex: 3, isCorrect: false, reason: "\uC624\uB2F5: \uAD50\uC721 \uC2DC\uC2A4\uD15C\uC758 \uC54C\uACE0\uB9AC\uC998 \uD22C\uBA85\uC131\uC740 \uBCF8\uBB38\uC758 \uC911\uC2EC \uB0B4\uC6A9\uC774 \uC544\uB2D9\uB2C8\uB2E4." },
+        { optionIndex: 4, isCorrect: false, reason: "\uC624\uB2F5: \uC815\uBCF4 \uACF5\uC720\uC758 \uC5ED\uC0AC\uC801 \uBC1C\uB2EC \uACFC\uC815\uC740 \uC9C0\uBB38\uC758 \uB17C\uC9C0\uC640 \uC0C1\uCDA9\uD569\uB2C8\uB2E4." }
       ],
       vocabularyHighlights: [
-        "analytical scope - \uBD84\uC11D\uC801 \uBC94\uC8FC",
-        "core implication - \uD575\uC2EC \uD568\uC758"
+        "core topic - \uC911\uC2EC \uC8FC\uC81C",
+        "analytical scope - \uBD84\uC11D\uC801 \uBC94\uC704"
       ],
       syntaxHighlights: [
-        "\uC6D0\uBB38 \uC9C0\uBB38 \uB3C4\uC785\uBD80\uC640 \uACB0\uB860\uBD80 \uBB38\uC7A5\uC758 \uD328\uB7EC\uD504\uB808\uC774\uC9D5(Paraphrasing)",
-        "\uC8FC\uC81C\uBB38 \uC704\uCE58 \uD30C\uC545 \uBC0F \uD544\uC790\uC758 \uC8FC\uC548\uC810 \uB3C4\uCD9C"
+        "\uC9C0\uBB38 \uC11C\uB450\uC640 \uACB0\uB860\uBD80\uB97C \uC544\uC6B0\uB974\uB294 \uD328\uB7EC\uD504\uB808\uC774\uC9D5(Paraphrasing)",
+        "\uD544\uC790\uC758 \uD575\uC2EC \uC8FC\uC7A5 \uD30C\uC545"
       ]
     };
   }
@@ -594,7 +594,7 @@ CRITICAL QUESTION TYPE FORMATTING RULES:
 4. "\uC5B4\uD718 \uC801\uC808\uC131":
    - question: "[EBS ...] \uB2E4\uC74C \uAE00\uC758 \uBC11\uC904 \uCE5C \uBD80\uBD84 \uC911, \uBB38\uB9E5\uC0C1 \uB0B1\uB9D0\uC758 \uC4F0\uC784\uC774 \uC801\uC808\uD558\uC9C0 \uC54A\uC740 \uAC83\uC740?"
    - modifiedPassage: Keep the exact original passage, marking 5 numbered vocabulary words directly inside the original text as \u2460 <u>word1</u>, \u2461 <u>word2</u>, \u2462 <u>word3</u>, \u2463 <u>word4</u>, \u2464 <u>word5</u> (where ONE is contextually incorrect).
-   - options: ["\u2460 word1", "\u2461 word2", "\u2462 word3", "\u2463 word4", "\u2464 word5"].
+   - options: ["\u2460 <u>word1</u>", "\u2461 <u>word2</u>", "\u2462 <u>word3</u>", "\u2463 <u>word4</u>", "\u2464 <u>word5</u>"].
 
 5. "\uC8FC\uC81C \uBC0F \uC81C\uBAA9":
    - question: "[EBS ...] \uB2E4\uC74C \uAE00\uC758 \uC8FC\uC81C(\uB610\uB294 \uC81C\uBAA9)\uB85C \uAC00\uC7A5 \uC801\uC808\uD55C \uAC83\uC740?"
@@ -619,7 +619,7 @@ Difficulty Level: ${difficulty}`;
       systemInstruction: systemPrompt,
       responseMimeType: "application/json",
       responseSchema: transformResponseSchema
-    }, "pro");
+    }, "flash");
     const responseText = response.text;
     if (!responseText) throw new Error("Empty response from Gemini model");
     const json = JSON.parse(cleanJsonString(responseText));

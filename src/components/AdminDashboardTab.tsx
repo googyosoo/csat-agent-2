@@ -5,8 +5,8 @@ import {
   StudentActivity,
   SocraticSummary,
   LearningEvent,
-  fetchFirestoreStudentActivities,
-  fetchFirestoreSocraticSummaries,
+  getStoredStudentActivities,
+  getStoredSocraticSummaries,
   getStoredLearningEvents,
   calculateAnalyticsMetrics,
   clearAnalyticsData,
@@ -37,14 +37,91 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportResult, setReportResult] = useState<StudentReportResult | null>(null);
   const [copied, setCopied] = useState(false);
+  // Google Sheets & CSV Export Modal State
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
+
+  const triggerToast = (msg: string) => {
+    setSyncToast(msg);
+    setTimeout(() => setSyncToast(null), 4000);
+  };
+
+  const generateCSVContent = () => {
+    const headers = ['학생이름', '이메일', '접속상태', '최근접속시각', '체류시간(분)', '완료지문수', '변형문제풀이수', '소크라테스질의수', '주요탐구소재'];
+    const rows = students.map(s => {
+      const studentSocraticLogs = socSummaries.filter(
+        (soc) => soc.studentEmail.toLowerCase() === s.email.toLowerCase()
+      );
+      const mainTopics = studentSocraticLogs.map(l => l.keyTopic || '').filter(Boolean).join('; ') || 'EBS 지문 구문 및 어휘 탐구';
+
+      return [
+        `"${s.name.replace(/"/g, '""')}"`,
+        `"${s.email.replace(/"/g, '""')}"`,
+        `"${s.status === 'online' ? '접속 중' : '오프라인'}"`,
+        `"${s.lastLogin || '최근 접속 기록 있음'}"`,
+        `"${s.totalDwellTimeMinutes || 0}"`,
+        `"${s.completedPassagesCount || 0}"`,
+        `"${s.transformedQuestionsGenerated || 0}"`,
+        `"${s.socraticQuestionsCount || 0}"`,
+        `"${mainTopics.replace(/"/g, '""')}"`
+      ].join(',');
+    });
+
+    return '\uFEFF' + [headers.join(','), ...rows].join('\n');
+  };
+
+  const handleExportCSV = () => {
+    const csvContent = generateCSVContent();
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const today = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `2027_EBS_심화영어II_학습실적통계_${today}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    triggerToast('📊 CSV 학습자 데이터 파일이 다운로드되었습니다 (Excel 한글 인코딩 지원).');
+  };
+
+  const handleCopyForGoogleSheets = () => {
+    const headers = ['학생이름', '이메일', '접속상태', '최근접속시각', '체류시간(분)', '완료지문수', '변형문제풀이수', '소크라테스질의수', '주요탐구소재'];
+    const rows = students.map(s => {
+      const studentSocraticLogs = socSummaries.filter(
+        (soc) => soc.studentEmail.toLowerCase() === s.email.toLowerCase()
+      );
+      const mainTopics = studentSocraticLogs.map(l => l.keyTopic || '').filter(Boolean).join('; ') || 'EBS 지문 구문 및 어휘 탐구';
+
+      return [
+        s.name,
+        s.email,
+        s.status === 'online' ? '접속 중' : '오프라인',
+        s.lastLogin || '최근 접속',
+        s.totalDwellTimeMinutes || 0,
+        s.completedPassagesCount || 0,
+        s.transformedQuestionsGenerated || 0,
+        s.socraticQuestionsCount || 0,
+        mainTopics
+      ].join('\t');
+    });
+
+    const tsvContent = [headers.join('\t'), ...rows].join('\n');
+    navigator.clipboard.writeText(tsvContent);
+    triggerToast('📋 구글 시트용 데이터가 클립보드에 복사되었습니다! 열린 구글 시트에 Ctrl+V로 붙여넣으세요.');
+  };
+
+  const handleOpenGoogleSheetsNew = () => {
+    handleCopyForGoogleSheets();
+    window.open('https://sheets.new', '_blank');
+  };
 
   // Load accumulated real data from Firestore DB (or LocalStorage fallback)
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
 
-  const loadData = async () => {
-    const sList = await fetchFirestoreStudentActivities();
-    const socList = await fetchFirestoreSocraticSummaries();
+  const loadData = () => {
+    const sList = getStoredStudentActivities();
+    const socList = getStoredSocraticSummaries();
     const evList = getStoredLearningEvents();
     setStudents(sList);
     setSocSummaries(socList);
@@ -53,6 +130,9 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
   useEffect(() => {
     loadData();
+    // 5초마다 LocalStorage에서 최신 데이터를 가져와 대시보드를 자동 갱신
+    const intervalId = setInterval(loadData, 5000);
+    return () => clearInterval(intervalId);
   }, []);
 
   const handleResetData = () => {
@@ -141,6 +221,14 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-16">
+      {/* Sync Toast Notification */}
+      {syncToast && (
+        <div className="fixed top-5 right-5 z-50 bg-emerald-600 text-white font-bold text-xs px-4 py-3 rounded-xl shadow-2xl border border-emerald-400 flex items-center space-x-2 animate-bounce">
+          <i className="fa-solid fa-circle-check text-sm"></i>
+          <span>{syncToast}</span>
+        </div>
+      )}
+
       {/* Top Banner Header */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
@@ -160,14 +248,44 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
           </div>
         </div>
 
-        <div className="flex items-center space-x-3 text-xs text-slate-400">
+        <div className="flex items-center space-x-2.5 text-xs">
+          {/* Google Sheets Sync Button */}
+          <button
+            onClick={handleOpenGoogleSheetsNew}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all flex items-center space-x-2 shrink-0"
+            title="구글 시트(Google Sheets) 새 문서 생성 및 데이터 클립보드 즉시 연동"
+          >
+            <i className="fa-solid fa-table text-sm"></i>
+            <span>구글 시트 연동</span>
+          </button>
+
+          {/* CSV Export Button */}
+          <button
+            onClick={handleExportCSV}
+            className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all flex items-center space-x-2 shrink-0"
+            title="전체 학생 학습 실적 통계 CSV 파일 다운로드 (Excel 한글 지원)"
+          >
+            <i className="fa-solid fa-file-csv text-sm"></i>
+            <span>CSV 다운로드</span>
+          </button>
+
+          {/* More Sync Guide Modal Button */}
+          <button
+            onClick={() => setShowSyncModal(true)}
+            className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-all flex items-center space-x-1.5"
+            title="연동 방식 상세 설정"
+          >
+            <i className="fa-solid fa-link"></i>
+            <span>연동 안내</span>
+          </button>
+
           <button
             onClick={handleResetData}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-rose-900/50 text-slate-300 hover:text-rose-300 text-xs font-semibold rounded-xl border border-slate-700 hover:border-rose-700 transition-all flex items-center space-x-1.5"
+            className="px-2.5 py-2 bg-slate-800/80 hover:bg-rose-900/50 text-slate-400 hover:text-rose-300 text-xs font-semibold rounded-xl border border-slate-700 hover:border-rose-700 transition-all flex items-center space-x-1 shrink-0"
             title="수집된 모든 통계 데이터 리셋"
           >
             <i className="fa-solid fa-rotate-left"></i>
-            <span>통계 초기화</span>
+            <span>초기화</span>
           </button>
         </div>
       </div>
@@ -436,6 +554,106 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                   setSelectedStudent(null);
                   setReportResult(null);
                 }}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Google Sheets & CSV Integration Modal */}
+      {showSyncModal && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 my-8">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-lg font-bold">
+                  <i className="fa-solid fa-table"></i>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">구글 시트 (Google Sheets) & CSV 연동 센터</h3>
+                  <p className="text-[11px] text-slate-400">학습자 실적 데이터를 스프레드시트에 즉시 동기화합니다.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowSyncModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-all"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Option 1: Google Sheets Direct Sync */}
+              <div className="p-4 bg-slate-950 rounded-2xl border border-emerald-500/30 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-300 flex items-center space-x-1.5">
+                    <i className="fa-solid fa-cloud-arrow-up"></i>
+                    <span>방식 1. 구글 시트에 원클릭 연동 (추천)</span>
+                  </span>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30 font-bold">
+                    실시간 클립보드 Sync
+                  </span>
+                </div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  버튼 클릭 시 구글 시트 새 문서(<span className="font-mono text-emerald-300">sheets.new</span>)가 열리며 전체 학습자 실적 데이터가 자동으로 클립보드에 복사됩니다. 열린 시트 A1 셀에서 <span className="font-mono font-bold text-white">Ctrl + V</span>를 누르시면 됩니다.
+                </p>
+                <button
+                  onClick={() => {
+                    handleOpenGoogleSheetsNew();
+                    setShowSyncModal(false);
+                  }}
+                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow flex items-center justify-center space-x-2 text-xs"
+                >
+                  <i className="fa-solid fa-arrow-up-right-from-square"></i>
+                  <span>구글 시트 새 문서 열기 & 데이터 붙여넣기</span>
+                </button>
+              </div>
+
+              {/* Option 2: CSV File Download */}
+              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-blue-300 flex items-center space-x-1.5">
+                    <i className="fa-solid fa-file-csv"></i>
+                    <span>방식 2. Excel CSV 파일 내보내기</span>
+                  </span>
+                  <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded border border-blue-500/30 font-bold">
+                    UTF-8 BOM 인코딩
+                  </span>
+                </div>
+                <p className="text-slate-400 text-[11px] leading-relaxed">
+                  MS Excel 및 한글 엑셀 프로그램에서 한글 깨짐 없이 바로 열 수 있는 표준 CSV 파일로 내보냅니다.
+                </p>
+                <button
+                  onClick={() => {
+                    handleExportCSV();
+                    setShowSyncModal(false);
+                  }}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow flex items-center justify-center space-x-2 text-xs"
+                >
+                  <i className="fa-solid fa-download"></i>
+                  <span>CSV 파일 다운로드 (.csv)</span>
+                </button>
+              </div>
+
+              {/* Option 3: Copy to Clipboard */}
+              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 flex items-center justify-between">
+                <span className="text-[11px] text-slate-400">클립보드에 TSV 형식으로 직접 복사:</span>
+                <button
+                  onClick={handleCopyForGoogleSheets}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold rounded-lg border border-slate-700 transition-all flex items-center space-x-1"
+                >
+                  <i className="fa-solid fa-copy"></i>
+                  <span>데이터 클립보드 복사</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setShowSyncModal(false)}
                 className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700"
               >
                 닫기

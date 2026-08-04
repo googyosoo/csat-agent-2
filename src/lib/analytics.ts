@@ -45,17 +45,115 @@ export interface AnalyticsMetrics {
 const STORAGE_KEY_STUDENTS = 'csat_analytics_students_v1';
 const STORAGE_KEY_SOCRATIC = 'csat_analytics_socratic_v1';
 
+const DEFAULT_SAMPLE_STUDENTS: StudentActivity[] = [
+  {
+    id: 'std-sample-1',
+    email: 'minjun.kim@simin.hs.kr',
+    name: '김민준 (3학년 1반)',
+    avatarUrl: undefined,
+    loginCount: 5,
+    lastLogin: new Date().toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
+    totalDwellTimeMinutes: 45,
+    completedPassagesCount: 4,
+    transformedQuestionsGenerated: 6,
+    quizAccuracyPercentage: 85,
+    socraticQuestionsCount: 8,
+    status: 'online',
+  },
+  {
+    id: 'std-sample-2',
+    email: 'seoyeon.lee@simin.hs.kr',
+    name: '이서연 (3학년 2반)',
+    avatarUrl: undefined,
+    loginCount: 3,
+    lastLogin: '2026. 08. 04. 14:20',
+    totalDwellTimeMinutes: 32,
+    completedPassagesCount: 3,
+    transformedQuestionsGenerated: 4,
+    quizAccuracyPercentage: 100,
+    socraticQuestionsCount: 5,
+    status: 'offline',
+  },
+  {
+    id: 'std-sample-3',
+    email: 'hyunwoo.park@simin.hs.kr',
+    name: '박현우 (3학년 1반)',
+    avatarUrl: undefined,
+    loginCount: 2,
+    lastLogin: '2026. 08. 04. 11:15',
+    totalDwellTimeMinutes: 20,
+    completedPassagesCount: 2,
+    transformedQuestionsGenerated: 2,
+    quizAccuracyPercentage: 75,
+    socraticQuestionsCount: 3,
+    status: 'offline',
+  },
+];
+
 /**
  * Get stored student activities from localStorage (or Firestore fallback)
  */
 export function getStoredStudentActivities(): StudentActivity[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_STUDENTS);
-    if (!raw) return [];
-    return JSON.parse(raw);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(DEFAULT_SAMPLE_STUDENTS));
+      return DEFAULT_SAMPLE_STUDENTS;
+    }
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_SAMPLE_STUDENTS;
   } catch {
-    return [];
+    return DEFAULT_SAMPLE_STUDENTS;
   }
+}
+
+/**
+ * Helper to guarantee student record exists in array
+ */
+
+export function ensureStudentRecord(emailInput?: string | null, nameInput?: string | null): { students: StudentActivity[]; idx: number } {
+  const cleanEmail = (emailInput && emailInput.trim()) ? emailInput.trim().toLowerCase() : 'guest_student@simin.hs.kr';
+  const cleanName = (nameInput && nameInput.trim()) ? nameInput.trim() : (cleanEmail.includes('@') ? cleanEmail.split('@')[0] : '학습자');
+
+  const students = getStoredStudentActivities();
+  let idx = students.findIndex((s) => s.email.toLowerCase() === cleanEmail);
+
+  const nowStr = new Date().toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  if (idx < 0) {
+    const newRecord: StudentActivity = {
+      id: `std-${Date.now()}`,
+      email: cleanEmail,
+      name: cleanName,
+      loginCount: 1,
+      lastLogin: nowStr,
+      totalDwellTimeMinutes: 5,
+      completedPassagesCount: 1,
+      transformedQuestionsGenerated: 0,
+      quizAccuracyPercentage: 100,
+      socraticQuestionsCount: 0,
+      status: 'online',
+    };
+    students.unshift(newRecord);
+    idx = 0;
+  } else {
+    students[idx].status = 'online';
+    students[idx].lastLogin = nowStr;
+  }
+
+  try {
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
+    const docId = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
+    setDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
+  } catch (e) {}
+
+  return { students, idx };
 }
 
 /**
@@ -71,7 +169,7 @@ export async function fetchFirestoreStudentActivities(): Promise<StudentActivity
     querySnapshot.forEach((docSnap) => {
       list.push(docSnap.data() as StudentActivity);
     });
-    return list;
+    return list.length > 0 ? list : getStoredStudentActivities();
   } catch (e) {
     return getStoredStudentActivities();
   }
@@ -113,58 +211,21 @@ export async function fetchFirestoreSocraticSummaries(): Promise<SocraticSummary
  * Record user login event and save to Firestore & LocalStorage
  */
 export function recordUserLogin(user: { email?: string | null; displayName?: string | null; photoURL?: string | null }): StudentActivity[] {
-  if (!user || !user.email) return getStoredStudentActivities();
+  const email = user?.email || 'guest_student@simin.hs.kr';
+  const name = user?.displayName || (email.includes('@') ? email.split('@')[0] : '학습자');
+  const { students, idx } = ensureStudentRecord(email, name);
 
-  const students = getStoredStudentActivities();
-  const cleanEmail = user.email.trim().toLowerCase();
-  const nowStr = new Date().toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  students[idx].loginCount += 1;
+  students[idx].status = 'online';
 
-  const existingIndex = students.findIndex((s) => s.email.toLowerCase() === cleanEmail);
-  let updatedRecord: StudentActivity;
-
-  if (existingIndex >= 0) {
-    updatedRecord = {
-      ...students[existingIndex],
-      name: user.displayName || students[existingIndex].name || cleanEmail.split('@')[0],
-      avatarUrl: user.photoURL || students[existingIndex].avatarUrl,
-      loginCount: students[existingIndex].loginCount + 1,
-      lastLogin: nowStr,
-      status: 'online',
-    };
-    students[existingIndex] = updatedRecord;
-  } else {
-    updatedRecord = {
-      id: `std-${Date.now()}`,
-      email: cleanEmail,
-      name: user.displayName || cleanEmail.split('@')[0],
-      avatarUrl: user.photoURL || undefined,
-      loginCount: 1,
-      lastLogin: nowStr,
-      totalDwellTimeMinutes: 10,
-      completedPassagesCount: 1,
-      transformedQuestionsGenerated: 0,
-      quizAccuracyPercentage: 100,
-      socraticQuestionsCount: 0,
-      status: 'online',
-    };
-    students.unshift(updatedRecord);
+  if (user?.photoURL) {
+    students[idx].avatarUrl = user.photoURL;
   }
 
-  // LocalStorage save
   try {
     localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
-  } catch (e) {}
-
-  // Firestore DB save (async background)
-  try {
-    const docId = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
-    setDoc(doc(db, 'students', docId), updatedRecord, { merge: true }).catch(() => {});
+    const docId = email.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
+    setDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
   } catch (e) {}
 
   return students;
@@ -182,7 +243,7 @@ export function recordSocraticQuestion(data: {
   questionText: string;
   hintLevel: number;
 }): void {
-  const email = data.studentEmail || '익명 학습자';
+  const email = data.studentEmail || 'guest_student@simin.hs.kr';
   const name = data.studentName || email.split('@')[0];
   const nowStr = new Date().toLocaleString('ko-KR', {
     year: 'numeric',
@@ -214,44 +275,36 @@ export function recordSocraticQuestion(data: {
 
   try {
     localStorage.setItem(STORAGE_KEY_SOCRATIC, JSON.stringify(summaries.slice(0, 50)));
-  } catch (e) {}
-
-  // Firestore DB save
-  try {
     setDoc(doc(db, 'socratic_logs', newLog.id), newLog).catch(() => {});
   } catch (e) {}
 
-  // Update student activity count
-  if (data.studentEmail) {
-    const students = getStoredStudentActivities();
-    const idx = students.findIndex((s) => s.email.toLowerCase() === data.studentEmail?.toLowerCase());
-    if (idx >= 0) {
-      students[idx].socraticQuestionsCount += 1;
-      students[idx].totalDwellTimeMinutes += 2;
-      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
-      const docId = data.studentEmail.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
-      setDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
-    }
-  }
+  // Automatically update student activity count
+  const { students, idx } = ensureStudentRecord(email, name);
+  students[idx].socraticQuestionsCount += 1;
+  students[idx].totalDwellTimeMinutes += 2;
+  try {
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
+    const docId = email.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
+    setDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
+  } catch (e) {}
 }
 
 /**
  * Record transformed question generation event in Firestore & LocalStorage
  */
 export function recordGeneratorUsage(studentEmail?: string | null): void {
-  if (!studentEmail) return;
-  const students = getStoredStudentActivities();
-  const idx = students.findIndex((s) => s.email.toLowerCase() === studentEmail.toLowerCase());
-  if (idx >= 0) {
-    students[idx].transformedQuestionsGenerated += 1;
-    students[idx].completedPassagesCount += 1;
-    students[idx].totalDwellTimeMinutes += 5;
-    try {
-      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
-      const docId = studentEmail.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
-      setDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
-    } catch (e) {}
-  }
+  const email = studentEmail || 'guest_student@simin.hs.kr';
+  const { students, idx } = ensureStudentRecord(email);
+
+  students[idx].transformedQuestionsGenerated += 1;
+  students[idx].completedPassagesCount += 1;
+  students[idx].totalDwellTimeMinutes += 5;
+
+  try {
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
+    const docId = email.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
+    setDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
+  } catch (e) {}
 }
 
 /**
@@ -261,6 +314,7 @@ export function clearAnalyticsData(): void {
   try {
     localStorage.removeItem(STORAGE_KEY_STUDENTS);
     localStorage.removeItem(STORAGE_KEY_SOCRATIC);
+    localStorage.removeItem(STORAGE_KEY_LEARNING_EVENTS);
   } catch (e) {}
 }
 

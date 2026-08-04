@@ -56,8 +56,8 @@ export const SocraticTab: React.FC<SocraticTabProps> = ({ selectedPassage, custo
 
       // Record Socratic analytics
       recordSocraticQuestion({
-        studentEmail: auth.currentUser?.email,
-        studentName: auth.currentUser?.displayName,
+        studentEmail: authUser?.email,
+        studentName: authUser?.displayName,
         passageTitle: selectedPassage.title,
         lesson: selectedPassage.lesson,
         itemNo: selectedPassage.itemNo,

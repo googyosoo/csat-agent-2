@@ -85,8 +85,11 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
     }
   };
 
-  const cleanOptionText = (rawOpt: string) => {
-    return rawOpt.replace(/<[^>]*>/g, '');
+  const formatOptionContent = (rawOpt: string) => {
+    if (!rawOpt) return '';
+    // Strip leading choice numbers like ①, ②, 1., (1) to prevent double numbering with UI badge
+    const stripped = rawOpt.replace(/^([①②③④⑤\(\s]*[1-5][\)\.]?\s*)/, '');
+    return stripped.trim();
   };
 
   if (!selectedPassage) {
@@ -304,7 +307,13 @@ export const GeneratorTab: React.FC<GeneratorTabProps> = ({ selectedPassage, cus
                       }`}>
                         {idx + 1}
                       </span>
-                      <span className="leading-snug">{cleanOptionText(opt)}</span>
+                      <span
+                        className="leading-snug"
+                        dangerouslySetInnerHTML={{
+                          __html: formatOptionContent(opt)
+                            .replace(/<u>/g, '<u class="text-amber-300 font-bold underline decoration-amber-400 underline-offset-2">')
+                        }}
+                      />
                     </span>
 
                     {(userChoice !== null || showAnalysis) && (

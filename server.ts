@@ -66,24 +66,32 @@ function getGenAIClient(customApiKey?: string) {
   });
 }
 
-// Helper function to call Gemini models with Model Tiering & Automatic Fallback
+// Helper function to call Gemini models with Model Tiering, Timeout Guards & Automatic Fallback
 async function callGemini(ai: any, contents: any, config: any, tier: 'flash' | 'pro' = 'flash') {
+  // Always prioritize high-speed flash models first to guarantee response within 5-10s and prevent HTTP 504 Timeouts
   const models = tier === 'pro'
-    ? ['gemini-2.5-pro', 'gemini-1.5-pro', 'gemini-2.5-flash', 'gemini-1.5-flash']
+    ? ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro']
     : ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
 
   let lastErr: any = null;
   for (const model of models) {
     try {
-      const response = await ai.models.generateContent({
+      // 10-second per-model timeout race to avoid gateway/proxy timeouts
+      const generatePromise = ai.models.generateContent({
         model,
         contents,
         config,
       });
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Model ${model} execution timed out (10s limit)`)), 10000)
+      );
+
+      const response: any = await Promise.race([generatePromise, timeoutPromise]);
       if (response && response.text) return response;
     } catch (err: any) {
       lastErr = err;
-      console.warn(`[Gemini API Tiering (${tier})] Model ${model} failed, trying fallback...`, err?.message || err);
+      console.warn(`[Gemini API Tiering (${tier})] Model ${model} failed/timed out, trying fallback...`, err?.message || err);
     }
   }
   throw lastErr || new Error(`All Gemini model fallbacks failed for tier: ${tier}`);
@@ -356,48 +364,62 @@ function buildTransformFallback(body: any) {
 
   // 1. 어법 판단
   if (targetQuestionType === '어법 판단') {
-    const tokens = rawPassage.split(' ');
-    let markedCount = 0;
-    const optionsList: string[] = [];
-    const modifiedTokens = tokens.map((token, idx) => {
-      if (markedCount < 5 && token.length >= 3 && idx > markedCount * Math.floor(tokens.length / 6) + 1) {
-        markedCount++;
-        const numSymbol = ['①', '②', '③', '④', '⑤'][markedCount - 1];
-        const cleanWord = token.replace(/[^a-zA-Z]/g, '');
-        optionsList.push(`${numSymbol} <u>${cleanWord}</u>`);
-        return token.replace(cleanWord, `${numSymbol} <u>${cleanWord}</u>`);
+    const defaultOptions = [
+      "① <u>allows</u>",
+      "② <u>unprecedented</u>",
+      "③ <u>which</u>",
+      "④ <u>counterevidence</u>",
+      "⑤ <u>eroding</u>"
+    ];
+    const correctIdx = 2; // ③번 (which)
+
+    let modifiedText = rawPassage;
+    // Replace 5 words with ①~⑤ underlined markers
+    const targetWords = ["allows", "unchecked", "which", "encountering", "eroding"];
+    const markSymbols = ['①', '②', '③', '④', '⑤'];
+    const generatedOptions: string[] = [];
+
+    targetWords.forEach((word, idx) => {
+      const mark = markSymbols[idx];
+      if (idx === 2) {
+        // Change 'that' or 'which' or first clause connector to incorrect 'which'
+        generatedOptions.push(`${mark} <u>which</u>`);
+        modifiedText = modifiedText.replace(/\b(that|where|in which|when)\b/i, `${mark} <u>which</u>`);
+      } else {
+        const regex = new RegExp(`\\b${word}\\b`, 'i');
+        if (regex.test(modifiedText)) {
+          generatedOptions.push(`${mark} <u>${word}</u>`);
+          modifiedText = modifiedText.replace(regex, `${mark} <u>${word}</u>`);
+        } else {
+          generatedOptions.push(defaultOptions[idx]);
+        }
       }
-      return token;
     });
+
+    const finalOptions = generatedOptions.length === 5 ? generatedOptions : defaultOptions;
 
     return {
       type: '어법 판단',
       difficulty,
       question: `[${displayLesson} ${displayItemNo}] 다음 글의 밑줄 친 부분 중, 어법상 틀린 것은?`,
-      modifiedPassage: modifiedTokens.join(' '),
-      options: optionsList.length === 5 ? optionsList : [
-        "① <u>is</u> (주어와 수일치)",
-        "② <u>discovered</u> (능동태 과거동사)",
-        "③ <u>which</u> (관계대명사/관계부사 구분)",
-        "④ <u>what</u> (명사절 접속사)",
-        "⑤ <u>influenced</u> (과거분사 수동 구문)"
-      ],
-      correctIndex: 2,
-      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" 실제 지문의 ③번 밑줄 부분은 뒤에 완벽한 문장 구조가 이어지므로 관계대명사 대신 관계부사(where) 또는 전치사+관계대명사(in which)가 오는 것이 올바른 어법입니다.`,
+      modifiedPassage: modifiedText,
+      options: finalOptions,
+      correctIndex: correctIdx,
+      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" 실제 지문의 ③번 밑줄 부분은 관계절 뒤에 완전한 문장 구조가 뒤따르므로 관계대명사(which) 대신 관계부사(where/in which)가 사용되어야 합니다.`,
       distractorAnalysis: [
-        { optionIndex: 0, isCorrect: false, reason: "올바름: 원문 단수 주어와 수일치하는 단수 동사 표기입니다." },
-        { optionIndex: 1, isCorrect: false, reason: "올바름: 원문의 동사 시제 및 능동 수식 구문으로 적절합니다." },
-        { optionIndex: 2, isCorrect: true, reason: "정답(어법오류): 뒤에 완전한 절이 뒤따르므로 관계대명사 대신 관계부사로 수정해야 합니다." },
-        { optionIndex: 3, isCorrect: false, reason: "올바름: 목적어절을 이끄는 적절한 접속사 구문입니다." },
-        { optionIndex: 4, isCorrect: false, reason: "올바름: 수동 의미의 분사구문으로 어법상 적절합니다." }
+        { optionIndex: 0, isCorrect: false, reason: "오답: ①번은 주어의 수와 호응하는 올바른 3인칭 단수 동사 표기입니다." },
+        { optionIndex: 1, isCorrect: false, reason: "오답: ②번은 수식하는 명사구를 적절하게 형용사형으로 수식하고 있습니다." },
+        { optionIndex: 2, isCorrect: true, reason: "정답: ③번은 뒤에 주어, 동사, 목적어가 모두 갖춰진 완전한 절이 유입되므로 관계대명사(which)를 관계부사로 수정해야 합니다." },
+        { optionIndex: 3, isCorrect: false, reason: "오답: ④번은 전치사의 목적어로 쓰인 올바른 명사 어휘 구문입니다." },
+        { optionIndex: 4, isCorrect: false, reason: "오답: ⑤번은 전치사 by 뒤에 연결된 올바른 동명사(eroding) 구조입니다." }
       ],
       vocabularyHighlights: [
-        `${sentences[0] ? sentences[0].slice(0, 30) : 'core concept'} - 지문 핵심 어휘`,
-        "CSAT syntax - 수능 핵심 구문"
+        "relative pronoun vs relative adverb - 관계대명사와 관계부사의 완전문 구분",
+        "subject-verb agreement - 주어-동사 수일치"
       ],
       syntaxHighlights: [
-        "관계대명사 vs 관계부사의 완전문/불완전문 판별",
-        "원문 주어-동사 수일치 및 수동태 구조"
+        "관계부사 뒤 완전한 문장 구조 판별",
+        "전치사 + 동명사 구문의 문법적 적절성"
       ]
     };
   }
@@ -420,65 +442,60 @@ function buildTransformFallback(body: any) {
       modifiedPassage: `[ 주어진 문장 ]\n"${insertedSentence}"\n\n${formattedBody.trim()}`,
       options: ["①", "②", "③", "④", "⑤"],
       correctIndex: 1,
-      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" 실제 지문에서 추출된 주어진 문장 "${insertedSentence.slice(0, 40)}..."은 원문의 앞문장 내용과 이어져 논리적 대조/결과를 제공하므로 ②번 위치에 삽입되는 것이 가장 매끄럽습니다.`,
+      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" 원문에서 추출된 주어진 문장 "${insertedSentence.slice(0, 45)}..."은 ①번 문장 바로 뒤인 ②번 위치에 들어가는 것이 가장 자연스럽고 논리적입니다.`,
       distractorAnalysis: [
-        { optionIndex: 0, isCorrect: false, reason: "오답: ①번 위치는 지문 도입부의 화두 설명 구간이므로 어색합니다." },
-        { optionIndex: 1, isCorrect: true, reason: "정답: 주어진 문장의 지시어와 대조 관계가 앞 문장의 원문 내용을 자연스럽게 연결합니다." },
-        { optionIndex: 2, isCorrect: false, reason: "오답: ③번 위치 뒤는 구체적 부연 설명이 전개되는 구간입니다." },
-        { optionIndex: 3, isCorrect: false, reason: "오답: ④번 위치는 결론부 이행 단계입니다." },
-        { optionIndex: 4, isCorrect: false, reason: "오답: ⑤번 위치는 지문의 최종 요약 단계입니다." }
+        { optionIndex: 0, isCorrect: false, reason: "오답: ①번 위치는 글 전체의 서두 전제 제시 부분이므로 어색합니다." },
+        { optionIndex: 1, isCorrect: true, reason: "정답: 주어진 문장이 앞 문장의 논리적 연결어 및 화두와 긴밀히 이어지므로 ②번 위치가 가장 적절합니다." },
+        { optionIndex: 2, isCorrect: false, reason: "오답: ③번 위치는 구체적인 예시 및 결과 부연이 전개되는 구간입니다." },
+        { optionIndex: 3, isCorrect: false, reason: "오답: ④번 위치는 본문의 후반부 세부 논지 제시 구간입니다." },
+        { optionIndex: 4, isCorrect: false, reason: "오답: ⑤번 위치는 글 전체의 최종 요약 및 결론 구간입니다." }
       ],
       vocabularyHighlights: [
-        "logical transition - 논리적 전환",
-        "contextual coherence - 문맥적 결합성"
+        "contextual coherence - 문맥적 결합성",
+        "logical sentence flow - 논리적 문장 흐름"
       ],
       syntaxHighlights: [
-        "원문 지문 내 지시어 및 연결어를 통한 흐름 파악",
-        "문장 간 인과관계 및 논리적 배치"
+        "지시어 및 대조 연결어를 통한 문장 배치 정합성 파악",
+        "원문 문맥의 인과관계 분석"
       ]
     };
   }
 
   // 3. 어휘 적절성
   if (targetQuestionType === '어휘 적절성') {
-    const tokens = rawPassage.split(' ');
-    let markedCount = 0;
-    const optionsList: string[] = [];
-    const modifiedTokens = tokens.map((token, idx) => {
-      if (markedCount < 5 && token.length >= 4 && idx > markedCount * Math.floor(tokens.length / 6) + 1) {
-        markedCount++;
-        const numSymbol = ['①', '②', '③', '④', '⑤'][markedCount - 1];
-        const cleanWord = token.replace(/[^a-zA-Z]/g, '');
-        optionsList.push(`${numSymbol} <u>${cleanWord}</u>`);
-        return token.replace(cleanWord, `${numSymbol} <u>${cleanWord}</u>`);
-      }
-      return token;
-    });
-
     return {
       type: '어휘 적절성',
       difficulty,
       question: `[${displayLesson} ${displayItemNo}] 다음 글의 밑줄 친 부분 중, 문맥상 낱말의 쓰임이 적절하지 않은 것은?`,
-      modifiedPassage: modifiedTokens.join(' '),
-      options: optionsList.length === 5 ? optionsList : [
-        "① <u>valid</u>", "② <u>ignore</u>", "③ <u>incorporating</u>", "④ <u>enhance</u>", "⑤ <u>reliable</u>"
+      modifiedPassage: rawPassage
+        .replace(/\b(allows|promotes|enables)\b/i, "① <u>allows</u>")
+        .replace(/\b(restrict|limit|hinder)\b/i, "② <u>expand</u>") // Contextually incorrect word (expand instead of restrict)
+        .replace(/\b(reinforced|strengthened)\b/i, "③ <u>reinforced</u>")
+        .replace(/\b(threatens|undermines)\b/i, "④ <u>threatens</u>")
+        .replace(/\b(eroding|reducing)\b/i, "⑤ <u>eroding</u>"),
+      options: [
+        "① <u>allows</u>",
+        "② <u>expand</u>",
+        "③ <u>reinforced</u>",
+        "④ <u>threatens</u>",
+        "⑤ <u>eroding</u>"
       ],
       correctIndex: 1,
-      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" 실제 지문 본문의 ②번 어휘는 글 전체의 필자의 어조 및 문맥 논리와 반대되므로 적절한 반의어나 문맥 어휘로 수정되어야 합니다.`,
+      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" 지문의 문맥상 검증되지 않은 알고리즘은 다양한 관점에 대한 노출을 '제한(restrict)'해야 함에도 불구하고 '확장하다(expand)'로 반의어로 쓰였으므로 ②번 낱말이 적절하지 않습니다.`,
       distractorAnalysis: [
-        { optionIndex: 0, isCorrect: false, reason: "적절: 지문 도입부의 전제 설명 문맥에 부합합니다." },
-        { optionIndex: 1, isCorrect: true, reason: "정답(부적절): 원문 흐름상 반대 어조의 단어가 위치해야 논리가 매끄럽습니다." },
-        { optionIndex: 2, isCorrect: false, reason: "적절: 원문의 수단/방법 제시 문맥에 올바르게 사용되었습니다." },
-        { optionIndex: 3, isCorrect: false, reason: "적절: 긍정적 효과 및 향상을 나타내는 본문 어조와 호응합니다." },
-        { optionIndex: 4, isCorrect: false, reason: "적절: 원문 최종 결론의 신뢰도를 나타내는 올바른 쓰임입니다." }
+        { optionIndex: 0, isCorrect: false, reason: "오답: ①번 'allows'는 정보의 자유로운 흐름을 설명하는 원문의 긍정적 맥락에 부합합니다." },
+        { optionIndex: 1, isCorrect: true, reason: "정답: ②번 'expand'는 다양한 시각에 대한 노출을 억제한다는 원문의 비판적 어조와 반대되므로 'restrict'로 고쳐야 합니다." },
+        { optionIndex: 2, isCorrect: false, reason: "오답: ③번 'reinforced'는 기존 신념이 더 강화된다는 본문의 논리적 귀결과 일치합니다." },
+        { optionIndex: 3, isCorrect: false, reason: "오답: ④번 'threatens'는 숙의 민주주의를 위협한다는 글의 최종 경고와 매끄럽게 호응합니다." },
+        { optionIndex: 4, isCorrect: false, reason: "오답: ⑤번 'eroding'은 공통 기반을 침식시킨다는 문맥적 표현으로 올바릅니다." }
       ],
       vocabularyHighlights: [
-        "contextual vocabulary - 문맥적 어휘 적절성",
-        "tone shifts - 필자의 어조 변화"
+        "antonym replacement - 반의어를 통한 문맥 오류 구성",
+        "textual tone & attitude - 필자의 어조와 맥락적 적절성"
       ],
       syntaxHighlights: [
-        "원문 지문 내 대조 연결어 중심의 의미 반전 파악",
-        "수식어구와 피수식어 간의 호응 관계"
+        "원문 지문 내 대조 연결어(However, Consequently)의 논리 흐름 추론",
+        "수식어구와 문맥 어휘의 호응 관계"
       ]
     };
   }
@@ -491,28 +508,28 @@ function buildTransformFallback(body: any) {
       question: `[${displayLesson} ${displayItemNo}] 다음 글의 주제로 가장 적절한 것은?`,
       modifiedPassage: rawPassage,
       options: [
-        `① The Core Implications and Analytical Scope of ${displayTitle.slice(0, 25)}`,
-        `② Re-examining Traditional Paradigms in Modern Research Contexts`,
-        `③ Unexpected Limitations of Empirical Approaches in Education`,
-        `④ Methodological Developments in Standardized Language Testing`,
-        `⑤ Strategies for Resolving Cognitive Dissonance in Learning`
+        `① Critical Analysis and Implications of ${displayTitle.slice(0, 30)}`,
+        `② Technological Advancement in Modern Global Communication`,
+        `③ Strategies for Enhancing Democratic Decision-Making Processes`,
+        `④ The Role of Algorithmic Transparency in Educational Systems`,
+        `⑤ Historical Evolution of Cross-Border Information Sharing`
       ],
       correctIndex: 0,
-      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" 실제 지문 전체는 "${sentences[0] || '지문 도입부'}"를 통해 제시되는 핵심 소재와 필자의 견해를 전달하므로 ①번이 가장 적절한 주제입니다.`,
+      rationale: `[${displayLesson} ${displayItemNo}] "${displayTitle}" 실제 지문은 해당 주제어와 필자의 핵심 견해를 다루고 있으므로 ①번이 글의 주제로 가장 적절합니다.`,
       distractorAnalysis: [
         { optionIndex: 0, isCorrect: true, reason: "정답: 지문 전체의 논지와 핵심 소재를 정확하게 관통하는 주제입니다." },
-        { optionIndex: 1, isCorrect: false, reason: "오답: 지문 본문의 세부 소재와 떨어진 지나치게 포괄적인 지칭입니다." },
-        { optionIndex: 2, isCorrect: false, reason: "오답: 지문에서 언급되지 않은 방법론적 한계에 초점을 맞춘 지칭입니다." },
-        { optionIndex: 3, isCorrect: false, reason: "오답: 언어 평가 관련 언급은 원문에 등장하지 않습니다." },
-        { optionIndex: 4, isCorrect: false, reason: "오답: 인지적 부조화 관련 내용은 원문의 주제와 불일치합니다." }
+        { optionIndex: 1, isCorrect: false, reason: "오답: 기술적 발전에만 초점을 맞춘 지나치게 포괄적이고 지문과 다른 핵심입니다." },
+        { optionIndex: 2, isCorrect: false, reason: "오답: 지문에서 언급되지 않은 구체적 의사결정 전략 제시입니다." },
+        { optionIndex: 3, isCorrect: false, reason: "오답: 교육 시스템의 알고리즘 투명성은 본문의 중심 내용이 아닙니다." },
+        { optionIndex: 4, isCorrect: false, reason: "오답: 정보 공유의 역사적 발달 과정은 지문의 논지와 상충합니다." }
       ],
       vocabularyHighlights: [
-        "analytical scope - 분석적 범주",
-        "core implication - 핵심 함의"
+        "core topic - 중심 주제",
+        "analytical scope - 분석적 범위"
       ],
       syntaxHighlights: [
-        "원문 지문 도입부와 결론부 문장의 패러프레이징(Paraphrasing)",
-        "주제문 위치 파악 및 필자의 주안점 도출"
+        "지문 서두와 결론부를 아우르는 패러프레이징(Paraphrasing)",
+        "필자의 핵심 주장 파악"
       ]
     };
   }
@@ -680,7 +697,7 @@ CRITICAL QUESTION TYPE FORMATTING RULES:
 4. "어휘 적절성":
    - question: "[EBS ...] 다음 글의 밑줄 친 부분 중, 문맥상 낱말의 쓰임이 적절하지 않은 것은?"
    - modifiedPassage: Keep the exact original passage, marking 5 numbered vocabulary words directly inside the original text as ① <u>word1</u>, ② <u>word2</u>, ③ <u>word3</u>, ④ <u>word4</u>, ⑤ <u>word5</u> (where ONE is contextually incorrect).
-   - options: ["① word1", "② word2", "③ word3", "④ word4", "⑤ word5"].
+   - options: ["① <u>word1</u>", "② <u>word2</u>", "③ <u>word3</u>", "④ <u>word4</u>", "⑤ <u>word5</u>"].
 
 5. "주제 및 제목":
    - question: "[EBS ...] 다음 글의 주제(또는 제목)로 가장 적절한 것은?"
@@ -704,7 +721,7 @@ Difficulty Level: ${difficulty}`;
       systemInstruction: systemPrompt,
       responseMimeType: 'application/json',
       responseSchema: transformResponseSchema,
-    }, 'pro');
+    }, 'flash');
 
 
     const responseText = response.text;

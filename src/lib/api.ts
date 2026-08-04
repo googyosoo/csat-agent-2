@@ -14,7 +14,10 @@ export async function safeFetchJson<T = any>(url: string, options?: RequestInit)
     } else {
       const text = await response.text();
       console.error(`[API Non-JSON Error ${response.status}]:`, text.slice(0, 300));
-      throw new Error(`서버 응답 오류 (HTTP ${response.status}): 올바른 데이터 형식(JSON)이 아닙니다. 백엔드 처리 상태를 확인해 주세요.`);
+      if (response.status === 504) {
+        throw new Error(`AI 서버 응답 시간 초과 (HTTP 504 Timeout). 생성 요청이 복잡하여 지연되었습니다. '변형 문제 생성' 버튼을 다시 클릭해 주세요.`);
+      }
+      throw new Error(`서버 응답 오류 (HTTP ${response.status}): 백엔드 연결 상태를 확인해 주세요.`);
     }
   }
 

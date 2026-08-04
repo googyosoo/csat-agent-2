@@ -11,6 +11,7 @@ import { VocabTab } from './components/VocabTab';
 import { IngestModal } from './components/IngestModal';
 import { MistakeVaultModal } from './components/MistakeVaultModal';
 import { AdminDashboardTab } from './components/AdminDashboardTab';
+import { StudentDashboardTab } from './components/StudentDashboardTab';
 import { LandingPage } from './components/LandingPage';
 import { subscribeToAuth, logout, User } from './lib/firebase';
 import { validateUserAccess, ALLOWED_STUDENT_DOMAIN, ADMIN_EMAILS } from './lib/adminAuth';
@@ -33,6 +34,12 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
+    // Record initial learning session for guest/anonymous visitors
+    recordUserLogin({
+      email: 'guest_student@simin.hs.kr',
+      displayName: '학습자 (2027 심화영어II)',
+    });
+
     const unsubscribe = subscribeToAuth(async (user) => {
       if (user) {
         const access = validateUserAccess(user.email);
@@ -139,7 +146,8 @@ export default function App() {
             { id: 'socratic', label: '소크라테스', icon: 'fa-brain', color: 'bg-emerald-600' },
             { id: 'generator', label: '변형문항 생성', icon: 'fa-wand-magic-sparkles', color: 'bg-amber-600' },
             { id: 'vocab', label: '어휘 보관함', icon: 'fa-layer-group', color: 'bg-pink-600' },
-            { id: 'admin', label: '대시보드', icon: 'fa-chart-line', color: 'bg-indigo-600' },
+            { id: 'student-dashboard', label: '마이 대시보드', icon: 'fa-user-gear', color: 'bg-cyan-600' },
+            { id: 'admin', label: '관리자', icon: 'fa-chart-line', color: 'bg-purple-600' },
           ].map((item) => (
             <button
               key={item.id}
@@ -177,6 +185,7 @@ export default function App() {
             <GeneratorTab selectedPassage={selectedPassage} customApiKey={customApiKey} />
           )}
           {activeTab === 'vocab' && <VocabTab selectedPassage={selectedPassage} onSpeak={speakText} />}
+          {activeTab === 'student-dashboard' && <StudentDashboardTab authUser={authUser} />}
           {activeTab === 'admin' && <AdminDashboardTab authUser={authUser} />}
         </div>
       </main>

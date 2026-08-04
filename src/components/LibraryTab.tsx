@@ -161,11 +161,11 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                 onClick={async () => {
                   if (isAnswered) return;
                   setSelectedOption(idx);
-                  if (authUser?.email) {
+                  try {
                     const { recordLearningEvent } = await import('../lib/analytics');
                     recordLearningEvent({
-                      studentEmail: authUser.email,
-                      studentName: authUser.displayName || undefined,
+                      studentEmail: authUser?.email || 'guest_student@simin.hs.kr',
+                      studentName: authUser?.displayName || '학습자',
                       passageId: selectedPassage.id,
                       passageTitle: selectedPassage.title,
                       lesson: selectedPassage.lesson,
@@ -175,7 +175,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                       correctIndex: selectedPassage.answerIndex,
                       isCorrect: idx === selectedPassage.answerIndex,
                     }).catch(console.error);
-                  }
+                  } catch (e) { console.error(e); }
                 }}
                 className={`p-4 rounded-xl border text-sm flex items-center justify-between cursor-pointer transition-all duration-200 ${optionStyle}`}
               >
