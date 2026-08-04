@@ -8,6 +8,7 @@ import {
   getStoredStudentActivities,
   getStoredSocraticSummaries,
   getStoredLearningEvents,
+  fetchServerAnalyticsData,
   fetchFirestoreStudentActivities,
   fetchFirestoreSocraticSummaries,
   calculateAnalyticsMetrics,
@@ -122,23 +123,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   const [reportError, setReportError] = useState<string | null>(null);
 
   const loadData = async () => {
-    const localSList = getStoredStudentActivities();
-    const firestoreSList = await fetchFirestoreStudentActivities().catch(() => []);
-    
-    // Merge Firestore with Local merged roster
-    const map = new Map<string, StudentActivity>();
-    localSList.forEach(s => map.set(s.email.toLowerCase(), s));
-    firestoreSList.forEach(s => {
-      if (s && s.email) {
-        const existing = map.get(s.email.toLowerCase());
-        map.set(s.email.toLowerCase(), existing ? { ...existing, ...s } : s);
-      }
-    });
-
-    const sList = Array.from(map.values());
-    const socList = await fetchFirestoreSocraticSummaries().catch(() => getStoredSocraticSummaries());
-    const evList = getStoredLearningEvents();
-
+    const { students: sList, socraticLogs: socList, learningEvents: evList } = await fetchServerAnalyticsData();
     setStudents(sList);
     setSocSummaries(socList);
     setLearningEvents(evList);

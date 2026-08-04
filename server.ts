@@ -47,6 +47,84 @@ function validatePassageInput(body: any, options: { checkPassage?: boolean; chec
 }
 
 
+// Global In-Memory Shared Analytics Store for cross-client tracking
+interface ServerStudentActivity {
+  id: string;
+  email: string;
+  name: string;
+  avatarUrl?: string;
+  loginCount: number;
+  lastLogin: string;
+  totalDwellTimeMinutes: number;
+  completedPassagesCount: number;
+  transformedQuestionsGenerated: number;
+  quizAccuracyPercentage: number;
+  socraticQuestionsCount: number;
+  status: 'online' | 'offline';
+}
+
+const globalStudentsMap = new Map<string, ServerStudentActivity>();
+const globalSocraticLogs: any[] = [];
+const globalLearningEvents: any[] = [];
+
+// Analytics Sync API: Student client reports activity
+app.post('/api/analytics/sync', (req, res) => {
+  try {
+    const { student, socraticLog, learningEvent } = req.body || {};
+
+    if (student && student.email) {
+      const emailKey = student.email.toLowerCase().trim();
+      const existing = globalStudentsMap.get(emailKey);
+      if (existing) {
+        globalStudentsMap.set(emailKey, {
+          ...existing,
+          ...student,
+          loginCount: Math.max(existing.loginCount, student.loginCount || 1),
+          totalDwellTimeMinutes: Math.max(existing.totalDwellTimeMinutes, student.totalDwellTimeMinutes || 0),
+          completedPassagesCount: Math.max(existing.completedPassagesCount, student.completedPassagesCount || 0),
+          transformedQuestionsGenerated: Math.max(existing.transformedQuestionsGenerated, student.transformedQuestionsGenerated || 0),
+          socraticQuestionsCount: Math.max(existing.socraticQuestionsCount, student.socraticQuestionsCount || 0),
+          status: 'online',
+          lastLogin: student.lastLogin || existing.lastLogin,
+        });
+      } else {
+        globalStudentsMap.set(emailKey, { ...student, status: 'online' });
+      }
+    }
+
+    if (socraticLog && socraticLog.id) {
+      if (!globalSocraticLogs.some(l => l.id === socraticLog.id)) {
+        globalSocraticLogs.unshift(socraticLog);
+      }
+    }
+
+    if (learningEvent && learningEvent.id) {
+      if (!globalLearningEvents.some(e => e.id === learningEvent.id)) {
+        globalLearningEvents.unshift(learningEvent);
+      }
+    }
+
+    return res.json({ success: true, count: globalStudentsMap.size });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Analytics Query API: Admin fetches all real student records
+app.get('/api/analytics/data', (req, res) => {
+  try {
+    const students = Array.from(globalStudentsMap.values());
+    return res.json({
+      success: true,
+      students,
+      socraticLogs: globalSocraticLogs,
+      learningEvents: globalLearningEvents,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Helper to get GoogleGenAI client (strictly using server environment variable or user custom key)
 function getGenAIClient(customApiKey?: string) {
   const apiKey = (customApiKey && typeof customApiKey === 'string' && customApiKey.trim().length > 0)

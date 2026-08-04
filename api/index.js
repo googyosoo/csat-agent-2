@@ -35,6 +35,59 @@ function validatePassageInput(body, options = {}) {
   }
   return null;
 }
+var globalStudentsMap = /* @__PURE__ */ new Map();
+var globalSocraticLogs = [];
+var globalLearningEvents = [];
+app.post("/api/analytics/sync", (req, res) => {
+  try {
+    const { student, socraticLog, learningEvent } = req.body || {};
+    if (student && student.email) {
+      const emailKey = student.email.toLowerCase().trim();
+      const existing = globalStudentsMap.get(emailKey);
+      if (existing) {
+        globalStudentsMap.set(emailKey, {
+          ...existing,
+          ...student,
+          loginCount: Math.max(existing.loginCount, student.loginCount || 1),
+          totalDwellTimeMinutes: Math.max(existing.totalDwellTimeMinutes, student.totalDwellTimeMinutes || 0),
+          completedPassagesCount: Math.max(existing.completedPassagesCount, student.completedPassagesCount || 0),
+          transformedQuestionsGenerated: Math.max(existing.transformedQuestionsGenerated, student.transformedQuestionsGenerated || 0),
+          socraticQuestionsCount: Math.max(existing.socraticQuestionsCount, student.socraticQuestionsCount || 0),
+          status: "online",
+          lastLogin: student.lastLogin || existing.lastLogin
+        });
+      } else {
+        globalStudentsMap.set(emailKey, { ...student, status: "online" });
+      }
+    }
+    if (socraticLog && socraticLog.id) {
+      if (!globalSocraticLogs.some((l) => l.id === socraticLog.id)) {
+        globalSocraticLogs.unshift(socraticLog);
+      }
+    }
+    if (learningEvent && learningEvent.id) {
+      if (!globalLearningEvents.some((e) => e.id === learningEvent.id)) {
+        globalLearningEvents.unshift(learningEvent);
+      }
+    }
+    return res.json({ success: true, count: globalStudentsMap.size });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/analytics/data", (req, res) => {
+  try {
+    const students = Array.from(globalStudentsMap.values());
+    return res.json({
+      success: true,
+      students,
+      socraticLogs: globalSocraticLogs,
+      learningEvents: globalLearningEvents
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
 function getGenAIClient(customApiKey) {
   const apiKey = customApiKey && typeof customApiKey === "string" && customApiKey.trim().length > 0 ? customApiKey.trim() : process.env.GEMINI_API_KEY;
   if (!apiKey) {
