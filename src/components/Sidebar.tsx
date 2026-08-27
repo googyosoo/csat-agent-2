@@ -35,6 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     : dataset.filter(p => p.lesson === filterLesson);
 
   const availableLessons = Array.from(new Set(dataset.map(p => p.lesson)));
+  const lessons = ['ALL', ...availableLessons];
   const isAdmin = authUser ? isAdminUser(authUser.email) : false;
 
   const handleTabSelect = (tabKey: string) => {
