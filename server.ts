@@ -64,7 +64,9 @@ interface ServerStudentActivity {
   status: 'online' | 'offline';
 }
 
-const ANALYTICS_FILE_PATH = path.join(process.cwd(), 'analytics_store.json');
+const ANALYTICS_FILE_PATH = (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
+  ? path.join('/tmp', 'analytics_store.json')
+  : path.join(process.cwd(), 'analytics_store.json');
 
 function loadAnalyticsFromFile(): { students: ServerStudentActivity[]; socraticLogs: any[]; learningEvents: any[] } {
   try {

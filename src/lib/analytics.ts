@@ -70,37 +70,90 @@ export async function fetchServerAnalyticsData(): Promise<{
   socraticLogs: SocraticSummary[];
   learningEvents: LearningEvent[];
 }> {
+  let serverStudents: StudentActivity[] = [];
+  let serverSocraticLogs: SocraticSummary[] = [];
+  let serverLearningEvents: LearningEvent[] = [];
+
+  // 1. Try Backend Server API
   try {
     const res = await fetch('/api/analytics/data');
     if (res.ok) {
       const data = await res.json();
       if (data.success) {
-        const serverStudents: StudentActivity[] = data.students || [];
-        const localStudents = getStoredStudentActivities();
-
-        const map = new Map<string, StudentActivity>();
-        localStudents.forEach((s) => map.set(s.email.toLowerCase(), s));
-        serverStudents.forEach((s) => {
-          if (s && s.email) {
-            const key = s.email.toLowerCase();
-            const existing = map.get(key);
-            map.set(key, existing ? { ...existing, ...s } : s);
-          }
-        });
-
-        return {
-          students: Array.from(map.values()),
-          socraticLogs: data.socraticLogs || getStoredSocraticSummaries(),
-          learningEvents: data.learningEvents || getStoredLearningEvents(),
-        };
+        serverStudents = data.students || [];
+        serverSocraticLogs = data.socraticLogs || [];
+        serverLearningEvents = data.learningEvents || [];
       }
     }
   } catch (e) {}
 
+  // 2. Try Firestore DB
+  let firestoreStudents: StudentActivity[] = [];
+  let firestoreSocratic: SocraticSummary[] = [];
+  try {
+    const [stdSnap, socSnap] = await Promise.allSettled([
+      getDocs(collection(db, 'students')),
+      getDocs(collection(db, 'socratic_logs')),
+    ]);
+    if (stdSnap.status === 'fulfilled' && !stdSnap.value.empty) {
+      stdSnap.value.forEach((d) => firestoreStudents.push(d.data() as StudentActivity));
+    }
+    if (socSnap.status === 'fulfilled' && !socSnap.value.empty) {
+      socSnap.value.forEach((d) => firestoreSocratic.push(d.data() as SocraticSummary));
+    }
+  } catch (e) {}
+
+  // 3. LocalStorage
+  const localStudents = getStoredStudentActivities();
+  const localSocratic = getStoredSocraticSummaries();
+  const localEvents = getStoredLearningEvents();
+
+  // Merge students
+  const studentMap = new Map<string, StudentActivity>();
+  const addOrUpdateStudent = (s: StudentActivity) => {
+    if (!s || !s.email) return;
+    const key = s.email.toLowerCase().trim();
+    const existing = studentMap.get(key);
+    if (!existing) {
+      studentMap.set(key, s);
+    } else {
+      studentMap.set(key, {
+        ...existing,
+        ...s,
+        loginCount: Math.max(existing.loginCount || 1, s.loginCount || 1),
+        totalDwellTimeMinutes: Math.max(existing.totalDwellTimeMinutes || 0, s.totalDwellTimeMinutes || 0),
+        completedPassagesCount: Math.max(existing.completedPassagesCount || 0, s.completedPassagesCount || 0),
+        transformedQuestionsGenerated: Math.max(existing.transformedQuestionsGenerated || 0, s.transformedQuestionsGenerated || 0),
+        socraticQuestionsCount: Math.max(existing.socraticQuestionsCount || 0, s.socraticQuestionsCount || 0),
+        status: s.status === 'online' || existing.status === 'online' ? 'online' : 'offline',
+      });
+    }
+  };
+
+  localStudents.forEach(addOrUpdateStudent);
+  serverStudents.forEach(addOrUpdateStudent);
+  firestoreStudents.forEach(addOrUpdateStudent);
+
+  // Merge Socratic logs (deduplicate by id)
+  const socMap = new Map<string, SocraticSummary>();
+  [...localSocratic, ...serverSocraticLogs, ...firestoreSocratic].forEach((soc) => {
+    if (soc && soc.id) {
+      socMap.set(soc.id, soc);
+    }
+  });
+
+  // Merge Learning Events (deduplicate by id)
+  const eventMap = new Map<string, LearningEvent>();
+  [...localEvents, ...serverLearningEvents].forEach((ev) => {
+    if (ev && ev.id) {
+      eventMap.set(ev.id, ev);
+    }
+  });
+
   return {
-    students: getStoredStudentActivities(),
-    socraticLogs: getStoredSocraticSummaries(),
-    learningEvents: getStoredLearningEvents(),
+    students: Array.from(studentMap.values()),
+    socraticLogs: Array.from(socMap.values()),
+    learningEvents: Array.from(eventMap.values()),
   };
 }
 

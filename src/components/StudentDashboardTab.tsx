@@ -7,6 +7,7 @@ import {
   getStoredStudentActivities,
   getStoredSocraticSummaries,
   getStoredLearningEvents,
+  fetchServerAnalyticsData,
   ensureStudentRecord,
 } from '../lib/analytics';
 
@@ -22,25 +23,36 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
   const [mySocraticLogs, setMySocraticLogs] = useState<SocraticSummary[]>([]);
   const [myLearningEvents, setMyLearningEvents] = useState<LearningEvent[]>([]);
 
-  const loadMyData = () => {
-    // Ensure current student record is loaded or provisioned
+  const loadMyData = async () => {
+    // 1. Ensure local record
     const { students, idx } = ensureStudentRecord(currentEmail, currentName);
-    const currentRecord = students[idx] || null;
+    let currentRecord = students[idx] || null;
+
+    // 2. Hydrate from server & Firestore
+    try {
+      const serverData = await fetchServerAnalyticsData();
+      const matched = serverData.students.find(
+        (s) => s.email.toLowerCase() === currentEmail
+      );
+      if (matched) {
+        currentRecord = { ...currentRecord, ...matched };
+      }
+      const filteredSoc = serverData.socraticLogs.filter(
+        (s) => s.studentEmail.toLowerCase() === currentEmail
+      );
+      const filteredEv = serverData.learningEvents.filter(
+        (e) => e.studentEmail.toLowerCase() === currentEmail
+      );
+      setMySocraticLogs(filteredSoc);
+      setMyLearningEvents(filteredEv);
+    } catch (e) {
+      const socSummaries = getStoredSocraticSummaries();
+      setMySocraticLogs(socSummaries.filter((s) => s.studentEmail.toLowerCase() === currentEmail));
+      const events = getStoredLearningEvents();
+      setMyLearningEvents(events.filter((e) => e.studentEmail.toLowerCase() === currentEmail));
+    }
+
     setMyActivity(currentRecord);
-
-    // Filter Socratic summaries for current student
-    const socSummaries = getStoredSocraticSummaries();
-    const filteredSoc = socSummaries.filter(
-      (s) => s.studentEmail.toLowerCase() === currentEmail
-    );
-    setMySocraticLogs(filteredSoc);
-
-    // Filter learning events for current student
-    const events = getStoredLearningEvents();
-    const filteredEv = events.filter(
-      (e) => e.studentEmail.toLowerCase() === currentEmail
-    );
-    setMyLearningEvents(filteredEv);
   };
 
   useEffect(() => {

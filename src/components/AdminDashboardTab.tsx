@@ -188,7 +188,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
   // Check admin authorization
   const isRealAdmin = authUser ? isAdminUser(authUser.email) : false;
-  const [previewMode, setPreviewMode] = useState<boolean>(true); // Preview for demo
+  const [previewMode, setPreviewMode] = useState<boolean>(false);
 
   const hasAccess = isRealAdmin || previewMode;
   const metrics = calculateAnalyticsMetrics(students);
