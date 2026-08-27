@@ -45,17 +45,25 @@ function loadAnalyticsFromFile() {
       return {
         students: Array.isArray(data.students) ? data.students : [],
         socraticLogs: Array.isArray(data.socraticLogs) ? data.socraticLogs : [],
-        learningEvents: Array.isArray(data.learningEvents) ? data.learningEvents : []
+        learningEvents: Array.isArray(data.learningEvents) ? data.learningEvents : [],
+        transformedQuestions: Array.isArray(data.transformedQuestions) ? data.transformedQuestions : []
       };
     }
   } catch (e) {
     console.error("Failed to read analytics file:", e);
   }
-  return { students: [], socraticLogs: [], learningEvents: [] };
+  return { students: [], socraticLogs: [], learningEvents: [], transformedQuestions: [] };
 }
 function saveAnalyticsToFile(data) {
   try {
-    fs.writeFileSync(ANALYTICS_FILE_PATH, JSON.stringify(data, null, 2), "utf-8");
+    const existing = loadAnalyticsFromFile();
+    const toSave = {
+      students: data.students || existing.students,
+      socraticLogs: data.socraticLogs || existing.socraticLogs,
+      learningEvents: data.learningEvents || existing.learningEvents,
+      transformedQuestions: data.transformedQuestions || existing.transformedQuestions || []
+    };
+    fs.writeFileSync(ANALYTICS_FILE_PATH, JSON.stringify(toSave, null, 2), "utf-8");
   } catch (e) {
     console.error("Failed to write analytics file:", e);
   }
@@ -67,6 +75,7 @@ initialStore.students.forEach((s) => {
 });
 var globalSocraticLogs = initialStore.socraticLogs;
 var globalLearningEvents = initialStore.learningEvents;
+var globalTransformedQuestions = initialStore.transformedQuestions || [];
 app.post("/api/analytics/sync", (req, res) => {
   try {
     const { student, socraticLog, learningEvent } = req.body || {};
@@ -103,7 +112,8 @@ app.post("/api/analytics/sync", (req, res) => {
     saveAnalyticsToFile({
       students: studentsArr,
       socraticLogs: globalSocraticLogs.slice(0, 300),
-      learningEvents: globalLearningEvents.slice(0, 500)
+      learningEvents: globalLearningEvents.slice(0, 500),
+      transformedQuestions: globalTransformedQuestions
     });
     return res.json({ success: true, count: globalStudentsMap.size, students: studentsArr });
   } catch (err) {
@@ -139,6 +149,63 @@ app.get("/api/analytics/data", (req, res) => {
       socraticLogs: globalSocraticLogs.length > 0 ? globalSocraticLogs : fileStore.socraticLogs,
       learningEvents: globalLearningEvents.length > 0 ? globalLearningEvents : fileStore.learningEvents
     });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.get("/api/transformed-questions", (req, res) => {
+  try {
+    const fileStore = loadAnalyticsFromFile();
+    if (fileStore.transformedQuestions && fileStore.transformedQuestions.length > 0) {
+      globalTransformedQuestions = fileStore.transformedQuestions;
+    }
+    const { passageId } = req.query;
+    let list = globalTransformedQuestions;
+    if (passageId && typeof passageId === "string") {
+      list = list.filter((q) => q.passageId === passageId);
+    }
+    return res.json({ success: true, questions: list });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/transformed-questions", (req, res) => {
+  try {
+    const question = req.body;
+    if (!question || !question.passageId || !question.question) {
+      return res.status(400).json({ success: false, error: "\uC720\uD6A8\uD55C \uBB38\uD56D \uB370\uC774\uD130\uAC00 \uC544\uB2D9\uB2C8\uB2E4." });
+    }
+    const newQuestion = {
+      ...question,
+      id: question.id || `trans-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      createdAt: question.createdAt || (/* @__PURE__ */ new Date()).toISOString()
+    };
+    globalTransformedQuestions = [
+      newQuestion,
+      ...globalTransformedQuestions.filter((q) => q.id !== newQuestion.id)
+    ];
+    saveAnalyticsToFile({
+      students: Array.from(globalStudentsMap.values()),
+      socraticLogs: globalSocraticLogs,
+      learningEvents: globalLearningEvents,
+      transformedQuestions: globalTransformedQuestions
+    });
+    return res.json({ success: true, question: newQuestion });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.delete("/api/transformed-questions/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    globalTransformedQuestions = globalTransformedQuestions.filter((q) => q.id !== id);
+    saveAnalyticsToFile({
+      students: Array.from(globalStudentsMap.values()),
+      socraticLogs: globalSocraticLogs,
+      learningEvents: globalLearningEvents,
+      transformedQuestions: globalTransformedQuestions
+    });
+    return res.json({ success: true, id });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

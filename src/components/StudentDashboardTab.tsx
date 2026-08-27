@@ -138,17 +138,17 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
           <div className="text-[10px] text-slate-500 mt-2">수능 유형별 변형 문제 학습 건수</div>
         </div>
 
-        {/* Card 4: Socratic Conversations */}
+        {/* Card 4: Accuracy */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg relative overflow-hidden group">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-bold">소크라테스 AI 대화</span>
-            <i className="fa-solid fa-brain text-rose-400 text-base"></i>
+            <span className="text-xs font-bold">문제 정답률</span>
+            <i className="fa-solid fa-bullseye text-cyan-400 text-base"></i>
           </div>
           <div className="flex items-baseline space-x-1.5">
-            <span className="text-3xl font-black text-white font-mono">{myActivity?.socraticQuestionsCount || 0}</span>
-            <span className="text-xs text-rose-400 font-bold">회</span>
+            <span className="text-3xl font-black text-white font-mono">{quizAccuracy}</span>
+            <span className="text-xs text-cyan-400 font-bold">%</span>
           </div>
-          <div className="text-[10px] text-slate-500 mt-2">메타인지 구문 질의 및 튜터 대화</div>
+          <div className="text-[10px] text-slate-500 mt-2">출제 변형문항 및 퀴즈 정답률</div>
         </div>
       </div>
 
@@ -167,11 +167,11 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
           </div>
 
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-            <div className="text-[11px] text-slate-400 font-bold">💡 메타인지 구문 탐구도</div>
+            <div className="text-[11px] text-slate-400 font-bold">💡 메타인지 학습 성취도</div>
             <div className="text-2xl font-black text-purple-400 font-mono">
-              {mySocraticLogs.length > 3 ? '상위 15% (우수)' : mySocraticLogs.length > 0 ? '보통 (성장 중)' : '시작 단계'}
+              {myLearningEvents.length > 5 ? '상위 10% (우수)' : myLearningEvents.length > 0 ? '성장 단계 (우수)' : '시작 단계'}
             </div>
-            <div className="text-[11px] text-slate-500">소크라테스 튜터 질문 누적 기반</div>
+            <div className="text-[11px] text-slate-500">출제 변형문제 학습 누적 기반</div>
           </div>
 
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
@@ -179,35 +179,35 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
             <div className="text-2xl font-black text-amber-400 font-mono">
               {myActivity && myActivity.totalDwellTimeMinutes > 30 ? 'A+ (매우 꾸준함)' : 'B (집중 추천)'}
             </div>
-            <div className="text-[11px] text-slate-500">체류 시간 및 문제 생성 활성 지표</div>
+            <div className="text-[11px] text-slate-500">체류 시간 및 문제 풀이 활동 지표</div>
           </div>
         </div>
       </div>
 
-      {/* Grid: Left (Socratic AI Question Logs), Right (Quiz Learning Events) */}
+      {/* Grid: Left (Reflection Logs), Right (Quiz Learning Events) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: My Socratic & Metacognition Logs */}
+        {/* Left: My Reflection Logs */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center space-x-2">
-              <i className="fa-solid fa-comments text-rose-400"></i>
-              <h3 className="text-sm font-bold text-white">나의 소크라테스 AI 질문 & 소감</h3>
+              <i className="fa-solid fa-comments text-purple-400"></i>
+              <h3 className="text-sm font-bold text-white">나의 지문 학습 소감 & 탐구 기록</h3>
             </div>
             <span className="text-xs text-slate-400 font-mono font-bold">({mySocraticLogs.length}건)</span>
           </div>
 
           {mySocraticLogs.length === 0 ? (
             <div className="py-10 text-center text-slate-500 space-y-2">
-              <i className="fa-solid fa-brain text-3xl text-rose-500/30"></i>
-              <p className="text-xs font-semibold text-slate-300">아직 작성한 소크라테스 질문이 없습니다.</p>
+              <i className="fa-solid fa-pen-fancy text-3xl text-purple-500/30"></i>
+              <p className="text-xs font-semibold text-slate-300">아직 작성한 학습 소감이 없습니다.</p>
               <p className="text-[11px] text-slate-500">
-                [소크라테스 튜터링] 탭에서 궁금한 구문이나 힌트를 질문해보세요.
+                [지문 분석 워크북] 하단에서 지문 분석 후 메타인지 소감을 작성해보세요.
               </p>
             </div>
           ) : (
             <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
               {mySocraticLogs.map((log) => (
-                <div key={log.id} className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2 hover:border-rose-500/40 transition-colors">
+                <div key={log.id} className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2 hover:border-purple-500/40 transition-colors">
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="font-bold text-purple-300">{log.passageTitle || 'EBS 지문'} ({log.lesson} {log.itemNo})</span>
                     <span className="text-slate-500 font-mono">{log.timestamp}</span>
@@ -216,8 +216,8 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
                     "{log.studentQuestionSnippet}"
                   </p>
                   <div className="flex items-center justify-between text-[10px]">
-                    <span className="px-2 py-0.5 bg-rose-500/10 text-rose-400 rounded-md border border-rose-500/20 font-bold">
-                      힌트 단계: Stage {log.aiHintLevel}
+                    <span className="px-2 py-0.5 bg-purple-500/10 text-purple-400 rounded-md border border-purple-500/20 font-bold">
+                      세특 자산 축적 완료
                     </span>
                     <span className="text-slate-400 font-semibold">{log.metacognitiveStatus}</span>
                   </div>
@@ -232,7 +232,7 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <div className="flex items-center space-x-2">
               <i className="fa-solid fa-list-check text-cyan-400"></i>
-              <h3 className="text-sm font-bold text-white">나의 퀴즈 및 변형문제 풀이 기록</h3>
+              <h3 className="text-sm font-bold text-white">나의 수능 변형문제 풀이 & 정답 이력</h3>
             </div>
             <span className="text-xs text-slate-400 font-mono font-bold">({myLearningEvents.length}건)</span>
           </div>
@@ -240,9 +240,9 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
           {myLearningEvents.length === 0 ? (
             <div className="py-10 text-center text-slate-500 space-y-2">
               <i className="fa-solid fa-file-signature text-3xl text-cyan-500/30"></i>
-              <p className="text-xs font-semibold text-slate-300">아직 완료한 퀴즈 풀이 이력이 없습니다.</p>
+              <p className="text-xs font-semibold text-slate-300">아직 완료한 변형문제 풀이 이력이 없습니다.</p>
               <p className="text-[11px] text-slate-500">
-                [지문 워크북] 또는 [AI 변형문항 생성기]에서 문제를 풀어보세요.
+                [AI 변형문항] 탭에서 선생님이 출제한 문제를 풀어보세요.
               </p>
             </div>
           ) : (

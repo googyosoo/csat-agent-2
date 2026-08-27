@@ -339,7 +339,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold">변형문제 생성</span>
+            <span className="text-xs font-bold">변형문제 풀이</span>
             <i className="fa-solid fa-file-pen text-emerald-400 text-sm"></i>
           </div>
           <div className="mt-2 flex items-baseline space-x-2">
@@ -350,12 +350,12 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg flex flex-col justify-between col-span-2 lg:col-span-1">
           <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-bold">소크라테스 질의</span>
-            <i className="fa-solid fa-comments text-rose-400 text-sm"></i>
+            <span className="text-xs font-bold">학습 소감/탐구</span>
+            <i className="fa-solid fa-comments text-purple-400 text-sm"></i>
           </div>
           <div className="mt-2 flex items-baseline space-x-2">
             <span className="text-2xl font-extrabold text-white font-mono">{metrics.totalSocraticConversations}</span>
-            <span className="text-xs text-rose-400 font-semibold">건</span>
+            <span className="text-xs text-purple-400 font-semibold">건</span>
           </div>
         </div>
       </div>
@@ -400,7 +400,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                   <th className="py-2.5 px-3">체류 시간</th>
                   <th className="py-2.5 px-3">완료 지문</th>
                   <th className="py-2.5 px-3">변형 문제</th>
-                  <th className="py-2.5 px-3">소크라테스</th>
+                  <th className="py-2.5 px-3">학습 소감</th>
                   <th className="py-2.5 px-3 text-right">AI 세특 & 피드백</th>
                 </tr>
               </thead>

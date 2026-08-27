@@ -95,8 +95,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartGuestPreview })
           </div>
         </div>
 
-        {/* 4 Feature Cards Row (1:1 identical layout to agent-1) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-left pt-8">
+        {/* 3 Feature Cards Row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left pt-8">
           <div className="bg-slate-900/60 border border-slate-800/80 p-5 rounded-2xl space-y-2.5 hover:border-blue-500/40 transition-all shadow-lg">
             <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-base font-bold">
               <i className="fa-solid fa-book-open"></i>
@@ -107,23 +107,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartGuestPreview })
             </p>
           </div>
 
-          <div className="bg-slate-900/60 border border-slate-800/80 p-5 rounded-2xl space-y-2.5 hover:border-purple-500/40 transition-all shadow-lg">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-base font-bold">
-              <i className="fa-solid fa-brain"></i>
-            </div>
-            <h4 className="text-xs font-extrabold text-white">소크라테스 AI 튜터</h4>
-            <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-              3단계 힌트 시스템으로 스스로 정답의 논리를 찾도록 유도하는 AI 튜터링.
-            </p>
-          </div>
-
           <div className="bg-slate-900/60 border border-slate-800/80 p-5 rounded-2xl space-y-2.5 hover:border-amber-500/40 transition-all shadow-lg">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-base font-bold">
               <i className="fa-solid fa-wand-magic-sparkles"></i>
             </div>
-            <h4 className="text-xs font-extrabold text-white">AI 변형문항 생성기</h4>
+            <h4 className="text-xs font-extrabold text-white">수능 변형문항 문제은행</h4>
             <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-              빈칸·어법·삽입 등 수능 최적화 6대 유형 변형문항 및 해설 동적 생성.
+              선생님이 출제한 빈칸·어법·삽입 6대 수능 변형문항 실시간 풀이 및 5선지 오답 해설.
             </p>
           </div>
 

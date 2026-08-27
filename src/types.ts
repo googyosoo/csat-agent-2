@@ -58,6 +58,16 @@ export interface GeneratedItem {
   syntaxHighlights?: string[];
 }
 
+export interface SavedTransformedQuestion extends GeneratedItem {
+  id: string;
+  passageId: string;
+  lesson: string;
+  itemNo: string;
+  title: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;

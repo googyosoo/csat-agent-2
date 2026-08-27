@@ -108,24 +108,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); handleTabSelect('socratic'); }}
-            className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              activeTab === 'socratic' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-            }`}
-          >
-            <i className="fa-solid fa-brain w-5 text-center"></i>
-            <span>소크라테스 튜터링</span>
-          </button>
-
-          <button
-            type="button"
             onClick={(e) => { e.preventDefault(); handleTabSelect('generator'); }}
             className={`w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'generator' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
             }`}
           >
             <i className="fa-solid fa-wand-magic-sparkles w-5 text-center"></i>
-            <span>AI 변형문항 생성기</span>
+            <span>AI 변형문항 문제은행</span>
           </button>
 
           <button

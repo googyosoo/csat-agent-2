@@ -5,7 +5,6 @@ import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { LibraryTab } from './components/LibraryTab';
 import { OrchestratorTab } from './components/OrchestratorTab';
-import { SocraticTab } from './components/SocraticTab';
 import { GeneratorTab } from './components/GeneratorTab';
 import { VocabTab } from './components/VocabTab';
 import { IngestModal } from './components/IngestModal';
@@ -157,8 +156,7 @@ export default function App() {
           {[
             { id: 'library', label: '지문 워크북', icon: 'fa-book-open', color: 'bg-blue-600' },
             { id: 'orchestrator', label: '오케스트레이터', icon: 'fa-network-wired', color: 'bg-purple-600' },
-            { id: 'socratic', label: '소크라테스', icon: 'fa-brain', color: 'bg-emerald-600' },
-            { id: 'generator', label: '변형문항 생성', icon: 'fa-wand-magic-sparkles', color: 'bg-amber-600' },
+            { id: 'generator', label: 'AI 변형문항', icon: 'fa-wand-magic-sparkles', color: 'bg-amber-600' },
             { id: 'vocab', label: '어휘 보관함', icon: 'fa-layer-group', color: 'bg-pink-600' },
             { id: 'student-dashboard', label: '마이 대시보드', icon: 'fa-user-gear', color: 'bg-cyan-600' },
             { id: 'admin', label: '관리자', icon: 'fa-chart-line', color: 'bg-purple-600' },
@@ -192,11 +190,8 @@ export default function App() {
           {activeTab === 'orchestrator' && (
             <OrchestratorTab selectedPassage={selectedPassage} customApiKey={customApiKey} />
           )}
-          {activeTab === 'socratic' && (
-            <SocraticTab selectedPassage={selectedPassage} customApiKey={customApiKey} authUser={authUser} />
-          )}
           {activeTab === 'generator' && (
-            <GeneratorTab selectedPassage={selectedPassage} customApiKey={customApiKey} />
+            <GeneratorTab selectedPassage={selectedPassage} customApiKey={customApiKey} authUser={authUser} />
           )}
           {activeTab === 'vocab' && <VocabTab selectedPassage={selectedPassage} onSpeak={speakText} />}
           {activeTab === 'student-dashboard' && <StudentDashboardTab authUser={authUser} />}
