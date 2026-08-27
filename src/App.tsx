@@ -32,43 +32,51 @@ export default function App() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // 1. Listen to Firebase Authentication state (mounted once)
   useEffect(() => {
-    // Record active learning session immediately
-    const currentUserEmail = authUser?.email || 'english1@simin.hs.kr';
-    const currentUserName = authUser?.displayName || (currentUserEmail.includes('@') ? currentUserEmail.split('@')[0] : '학습자');
-
-    recordUserLogin({
-      email: currentUserEmail,
-      displayName: currentUserName,
-    });
-
     const unsubscribe = subscribeToAuth(async (user) => {
       if (user) {
         const access = validateUserAccess(user.email);
         if (!access.allowed) {
           setDeniedReason(access.reason || '접근이 허용되지 않는 계정입니다.');
           setAuthUser(null);
-          await logout();
+          try {
+            await logout();
+          } catch (e) {
+            console.error(e);
+          }
           return;
         }
+        setDeniedReason(null);
+        setAuthUser(user);
         recordUserLogin(user);
+      } else {
+        setAuthUser(null);
       }
-      setDeniedReason(null);
-      setAuthUser(user);
     });
-
-    // 10s Heartbeat Timer to update student online presence and dwell time
-    const heartbeatTimer = setInterval(() => {
-      const activeEmail = authUser?.email || 'english1@simin.hs.kr';
-      const activeName = authUser?.displayName || (activeEmail.includes('@') ? activeEmail.split('@')[0] : '학습자');
-      recordUserLogin({ email: activeEmail, displayName: activeName });
-    }, 10000);
 
     return () => {
       unsubscribe();
+    };
+  }, []);
+
+  // 2. Heartbeat Timer to update student online presence and dwell time
+  useEffect(() => {
+    if (!authUser && !isGuestPreview) return;
+
+    const activeEmail = authUser?.email || (isGuestPreview ? 'guest_student@simin.hs.kr' : 'english1@simin.hs.kr');
+    const activeName = authUser?.displayName || (activeEmail.includes('@') ? activeEmail.split('@')[0] : '학습자');
+
+    recordUserLogin({ email: activeEmail, displayName: activeName });
+
+    const heartbeatTimer = setInterval(() => {
+      recordUserLogin({ email: activeEmail, displayName: activeName });
+    }, 15000);
+
+    return () => {
       clearInterval(heartbeatTimer);
     };
-  }, [authUser]);
+  }, [authUser?.email, isGuestPreview]);
 
   useEffect(() => {
     if (filterLesson !== 'ALL') {

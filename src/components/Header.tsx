@@ -74,10 +74,10 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
         <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold text-xs border border-blue-500/30 shrink-0">
-          {selectedPassage.lesson} {selectedPassage.itemNo}
+          {selectedPassage?.lesson || 'EBS'} {selectedPassage?.itemNo || ''}
         </span>
-        <span className="hidden sm:inline text-xs text-slate-400 shrink-0">[{selectedPassage.type}]</span>
-        <h2 className="text-xs md:text-sm font-bold text-slate-200 truncate max-w-[120px] sm:max-w-xs md:max-w-md">{selectedPassage.title}</h2>
+        <span className="hidden sm:inline text-xs text-slate-400 shrink-0">[{selectedPassage?.type || '수능'}]</span>
+        <h2 className="text-xs md:text-sm font-bold text-slate-200 truncate max-w-[120px] sm:max-w-xs md:max-w-md">{selectedPassage?.title || 'EBS 수능특강 영어'}</h2>
       </div>
 
       <div className="flex items-center space-x-2.5 shrink-0">
