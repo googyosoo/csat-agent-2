@@ -57,8 +57,22 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
 
   useEffect(() => {
     loadMyData();
-    const interval = setInterval(loadMyData, 3000);
-    return () => clearInterval(interval);
+    const interval = setInterval(loadMyData, 1000);
+
+    const handleUpdateEvent = () => {
+      loadMyData();
+    };
+
+    window.addEventListener('csat_analytics_updated', handleUpdateEvent);
+    window.addEventListener('focus', handleUpdateEvent);
+    document.addEventListener('visibilitychange', handleUpdateEvent);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('csat_analytics_updated', handleUpdateEvent);
+      window.removeEventListener('focus', handleUpdateEvent);
+      document.removeEventListener('visibilitychange', handleUpdateEvent);
+    };
   }, [currentEmail, currentName]);
 
   const correctCount = myLearningEvents.filter((e) => e.isCorrect).length;

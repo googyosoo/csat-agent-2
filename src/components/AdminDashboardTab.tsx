@@ -133,8 +133,22 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
   useEffect(() => {
     loadData();
-    const intervalId = setInterval(loadData, 2000);
-    return () => clearInterval(intervalId);
+    const intervalId = setInterval(loadData, 1000);
+
+    const handleUpdateEvent = () => {
+      loadData();
+    };
+
+    window.addEventListener('csat_analytics_updated', handleUpdateEvent);
+    window.addEventListener('focus', handleUpdateEvent);
+    document.addEventListener('visibilitychange', handleUpdateEvent);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('csat_analytics_updated', handleUpdateEvent);
+      window.removeEventListener('focus', handleUpdateEvent);
+      document.removeEventListener('visibilitychange', handleUpdateEvent);
+    };
   }, []);
 
   const handleResetData = () => {
