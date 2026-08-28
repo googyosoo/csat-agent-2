@@ -225,7 +225,7 @@ function getGenAIClient(customApiKey) {
   });
 }
 async function callGemini(ai, contents, config, tier = "flash") {
-  const models = tier === "pro" ? ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"] : ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+  const models = tier === "pro" ? ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"] : ["gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
   let lastErr = null;
   for (const model of models) {
     try {
