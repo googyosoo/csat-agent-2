@@ -142,12 +142,22 @@ app.get("/api/analytics/data", (req, res) => {
         }
       }
     });
+    const socMap = /* @__PURE__ */ new Map();
+    [...fileStore.socraticLogs, ...globalSocraticLogs].forEach((l) => {
+      if (l && l.id) socMap.set(l.id, l);
+    });
+    globalSocraticLogs = Array.from(socMap.values());
+    const evtMap = /* @__PURE__ */ new Map();
+    [...fileStore.learningEvents, ...globalLearningEvents].forEach((e) => {
+      if (e && e.id) evtMap.set(e.id, e);
+    });
+    globalLearningEvents = Array.from(evtMap.values());
     const students = Array.from(globalStudentsMap.values());
     return res.json({
       success: true,
       students,
-      socraticLogs: globalSocraticLogs.length > 0 ? globalSocraticLogs : fileStore.socraticLogs,
-      learningEvents: globalLearningEvents.length > 0 ? globalLearningEvents : fileStore.learningEvents
+      socraticLogs: globalSocraticLogs,
+      learningEvents: globalLearningEvents
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });

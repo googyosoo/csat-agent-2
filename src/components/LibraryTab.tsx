@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { EBSPassage } from '../types';
 import { User, signInWithGoogle } from '../lib/firebase';
+import { recordSocraticQuestion, recordLearningEvent } from '../lib/analytics';
 
 interface LibraryTabProps {
   selectedPassage: EBSPassage;
@@ -158,24 +159,26 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             return (
               <div
                 key={idx}
-                onClick={async () => {
+                onClick={() => {
                   if (isAnswered) return;
                   setSelectedOption(idx);
-                  try {
-                    const { recordLearningEvent } = await import('../lib/analytics');
-                    recordLearningEvent({
-                      studentEmail: authUser?.email || 'guest_student@simin.hs.kr',
-                      studentName: authUser?.displayName || '학습자',
-                      passageId: selectedPassage.id,
-                      passageTitle: selectedPassage.title,
-                      lesson: selectedPassage.lesson,
-                      itemNo: selectedPassage.itemNo,
-                      questionType: selectedPassage.type,
-                      selectedIndex: idx,
-                      correctIndex: selectedPassage.answerIndex,
-                      isCorrect: idx === selectedPassage.answerIndex,
-                    }).catch(console.error);
-                  } catch (e) { console.error(e); }
+                  const isAnsCorrect = idx === selectedPassage.answerIndex;
+                  const studentEmail = authUser?.email || 'guest_student@simin.hs.kr';
+                  const studentName = authUser?.displayName || (studentEmail.includes('@') ? studentEmail.split('@')[0] : '학습자');
+
+                  recordLearningEvent({
+                    studentEmail,
+                    studentName,
+                    passageId: selectedPassage.id,
+                    passageTitle: selectedPassage.title,
+                    lesson: selectedPassage.lesson,
+                    itemNo: selectedPassage.itemNo,
+                    questionType: selectedPassage.type,
+                    selectedIndex: idx,
+                    correctIndex: selectedPassage.answerIndex,
+                    isCorrect: isAnsCorrect,
+                    reasonText: isAnsCorrect ? '정답 선택' : '오답 선택',
+                  }).catch(console.error);
                 }}
                 className={`p-4 rounded-xl border text-sm flex items-center justify-between cursor-pointer transition-all duration-200 ${optionStyle}`}
               >
@@ -363,17 +366,20 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                     if (!metacognitionInput.trim()) return;
                     setIsSavingSummary(true);
                     try {
-                      const { recordSocraticQuestion } = await import('../lib/analytics');
+                      const studentEmail = authUser.email || 'guest_student@simin.hs.kr';
+                      const studentName = authUser.displayName || (studentEmail.includes('@') ? studentEmail.split('@')[0] : '학습자');
+
                       await recordSocraticQuestion({
-                        studentEmail: authUser.email,
-                        studentName: authUser.displayName,
+                        studentEmail,
+                        studentName,
                         passageTitle: selectedPassage.title,
                         lesson: selectedPassage.lesson,
                         itemNo: selectedPassage.itemNo,
-                        questionText: `[지문소감] ${metacognitionInput}`,
+                        questionText: metacognitionInput.trim(),
                         hintLevel: 1,
                       });
-                      setSummarySuccessMsg('🎉 학생의 메타인지 소감이 관리자 대시보드 및 세특 기록에 자동 저장되었습니다!');
+
+                      setSummarySuccessMsg('🎉 학생의 메타인지 소감이 관리자 대시보드 및 마이 대시보드에 즉시 저장 및 연동되었습니다!');
                       setMetacognitionInput('');
                     } catch (err: any) {
                       alert(`저장 중 오류가 발생했습니다: ${err?.message || err}`);
