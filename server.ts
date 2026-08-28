@@ -292,8 +292,8 @@ function getGenAIClient(customApiKey?: string) {
 async function callGemini(ai: any, contents: any, config: any, tier: 'flash' | 'pro' = 'flash') {
   // Always prioritize high-speed flash models first to guarantee response within 5-10s and prevent HTTP 504 Timeouts
   const models = tier === 'pro'
-    ? ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro']
-    : ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
+    ? ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash']
+    : ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
 
   let lastErr: any = null;
   for (const model of models) {
@@ -877,7 +877,12 @@ function getItemBankKey(passage: string, type: string, diff: string): string {
 console.info('[Pre-generation Engine] Initialized Item Bank Pre-generation Cache Pipeline');
 
 // 2. CSAT Transformed Question Generator
-app.post('/api/gemini/transform', validatePassageInput, async (req, res) => {
+app.post('/api/gemini/transform', async (req, res) => {
+  const invalid = validatePassageInput(req.body);
+  if (invalid) {
+    return res.status(400).json({ success: false, error: invalid });
+  }
+
   const { passage, lesson, itemNo, targetQuestionType = '빈칸 추론', difficulty = '수능 표준', customApiKey } = req.body;
 
   // S2: Item Bank Cache Check (0ms immediate response)

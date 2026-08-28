@@ -225,7 +225,7 @@ function getGenAIClient(customApiKey) {
   });
 }
 async function callGemini(ai, contents, config, tier = "flash") {
-  const models = tier === "pro" ? ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"] : ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
+  const models = tier === "pro" ? ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"] : ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
   let lastErr = null;
   for (const model of models) {
     try {
@@ -728,7 +728,11 @@ function getItemBankKey(passage, type, diff) {
   return `${cleanPassage}__${type}__${diff}`;
 }
 console.info("[Pre-generation Engine] Initialized Item Bank Pre-generation Cache Pipeline");
-app.post("/api/gemini/transform", validatePassageInput, async (req, res) => {
+app.post("/api/gemini/transform", async (req, res) => {
+  const invalid = validatePassageInput(req.body);
+  if (invalid) {
+    return res.status(400).json({ success: false, error: invalid });
+  }
   const { passage, lesson, itemNo, targetQuestionType = "\uBE48\uCE78 \uCD94\uB860", difficulty = "\uC218\uB2A5 \uD45C\uC900", customApiKey } = req.body;
   const cacheKey = getItemBankKey(passage, targetQuestionType, difficulty);
   if (itemBankCache.has(cacheKey)) {
