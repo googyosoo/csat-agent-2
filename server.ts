@@ -1579,34 +1579,39 @@ app.post('/api/gemini/student-report', async (req, res) => {
   const body = req.body || {};
   const student = body.student || {};
   const studentEmail = body.studentEmail || student.email || 'student@simin.hs.kr';
-  const studentName = body.studentName || student.name || '김학생';
+  const studentName = body.studentName || student.name || '학습자';
   const records = body.records || body.socraticLogs || [];
   const customApiKey = body.customApiKey;
 
-  const prompt = `You are a master High School English Teacher in Korea preparing official School Student Records (학교생활기록부 세부능력 및 특기사항).
-Analyze the following student's learning data and generate a personalized learning feedback report AND an official NEIS School Record Setek (세특) text.
+  const prompt = `You are an expert Korean High School English Teacher creating official School Life Records (학교생활기록부 교과세부능력 및 특기사항).
+Analyze the student's study logs and generate a high-quality personalized feedback report AND an official NEIS School Record Setek (세특) text.
 
 [Student Activity Data]
 - Name: ${studentName} (${studentEmail})
-- Total Logins: ${student?.loginCount || 1} times
-- Total Study Dwell Time: ${student?.totalDwellTimeMinutes || 25} minutes
-- Learning Records: ${JSON.stringify(records.slice(0, 5))}
+- Total Logins: ${student?.loginCount || 1} 회
+- Study Dwell Time: ${student?.totalDwellTimeMinutes || 25} 분
+- Completed Passages / Questions: ${student?.completedPassagesCount || 1} 건
+- Student Learning Logs & Reflections: ${JSON.stringify(records.slice(0, 5))}
 
-[Instruction Rules for Setek (세부능력 및 특기사항)]:
-1. TONE & STYLE: Write in official, formal Korean teacher observation style (~함., ~에서 두각을 나타냄., ~을 자율 탐구함.).
-2. CONTENT: Highlight how the student actively utilized 2027 EBS Career English passages, engaged with Socratic 3-step hint tutoring, identified complex syntax (e.g., relative clauses, contrastive discourse markers), and solved CSAT transformed questions. Reflect real study patterns and personal academic traits.
-3. BYTE LENGTH MANDATE: The "schoolRecordSetek" MUST BE STRICTLY BETWEEN 800 AND 900 BYTES in Korean (approximately 270~300 Korean characters with spaces). Do not exceed 950 bytes or be under 750 bytes.
-4. "byteCount" property must hold the exact calculated byte length.
+[CRITICAL INSTRUCTION RULES FOR SETEK (세부능력 및 특기사항)]:
+1. STRICT FORBIDDEN TERMS (NEVER USE):
+   - DO NOT USE: "2027", "심화영어II", "소크라테스", "소크라테스 AI튜터", "소크라테스 튜터링", "EBS", "수능연계", "EBS 수능 연계", "변형문제 생성기"
+   - Use standard educational terms instead: "영어 독해 및 지문 분석 활동", "텍스트 구조화 및 핵심 구문 탐구", "논리적 흐름 및 빈칸·어법 추론 문항 해결", "자기주도적 메타인지 학습 소감 작성".
 
-Respond ONLY with JSON matching the required schema.`;
+2. TONE & STYLE: Write in official, objective Korean high school teacher record style (~함., ~에서 뛰어난 역량을 보임., ~을 스스로 도출함., ~태도가 돋보임.).
+3. CONTENT HIGHLIGHTS: Detail how the student analyzed complex English passages, identified discourse markers and syntactic structures (e.g., participial clauses, conditional sentences, contrasting transitions), resolved inference-based questions, and reflected deeply on their learning processes.
+4. BYTE LENGTH MANDATE: The "schoolRecordSetek" MUST BE STRICTLY BETWEEN 800 AND 900 BYTES (approx. 270~300 Korean characters including spaces).
+5. "byteCount" property must contain the exact byte count.
+
+Respond ONLY with valid JSON matching the schema.`;
 
   try {
     const ai = getGenAIClient(customApiKey);
     const response = await callGemini(ai, [{ role: 'user', parts: [{ text: prompt }] }], {
       responseMimeType: 'application/json',
       responseSchema: studentReportSchema,
-      temperature: 0.3,
-    });
+      temperature: 0.2,
+    }, 'flash');
 
     const responseText = response.text;
     if (!responseText) throw new Error('Empty response from Gemini');
@@ -1616,21 +1621,21 @@ Respond ONLY with JSON matching the required schema.`;
     resultJson.studentName = studentName;
     resultJson.byteCount = getKoreanByteLength(resultJson.schoolRecordSetek || '');
     if (!Array.isArray(resultJson.keyCompetencies)) {
-      resultJson.keyCompetencies = ['주도적 메타인지 탐구', '논리적 지문 구조 분석', '수능 변형 문제 응용력'];
+      resultJson.keyCompetencies = ['주도적 메타인지 탐구', '논리적 지문 구조 분석', '심층 구문 추론 역량'];
     }
 
     res.json({ success: true, data: resultJson });
   } catch (error: any) {
-    console.info('[Student Report API] Generating intelligent fallback report.');
-    const sampleSetek = `'2027 심화영어II' 지문 분석 워크북과 소크라테스 AI 튜터를 적극 활용하여 영어 독해력과 지문 구조 파악 능력을 종합적으로 신장함. 특히 EBS 수능 연계 지문 학습 과정에서 가주어-진주어 구문 및 역접 연결어를 통한 논지 전환 파악에 남다른 메타인지적 탐구열을 보임. 소크라테스 튜터링 3단계 힌트 시스템을 단계별로 탐색하며 스스로 문맥상 어휘의 함축적 의미를 도출해내는 주도적인 학습 태도를 형성함. 수능 변형문제 생성기 기능을 응용하여 빈칸 추론 및 어법성 판단 문항을직접 풀이하고 분석함으로써 텍스트의 논리적 결속성을 파악하는 비판적 사고력이 매우 우수함.`;
+    console.info('[Student Report API] Generating clean educational fallback report:', error?.message || error);
+    const cleanSampleSetek = `영어 지문 심층 분석 워크북 학습 활동에 성실히 참여하여 고급 영어 텍스트의 맥락적 독해력과 논리적 지문 구조 파악 능력을 종합적으로 신장함. 특히 지문 분석 과정에서 가주어-진주어 구문 및 역접 연결어를 통한 논지 전환 파악에 남다른 탐구열을 보이며 문장 간 결속성을 치밀하게 분석함. 스스로 문맥상 어휘의 함축적 의미를 도출하고 취약 구문에 대한 메타인지적 학습 소감을 작성하여 자기주도적인 학습 태도를 형성함. 빈칸 추론 및 어법 판단 등 고난도 변형 문항을 주도적으로 풀이하고 오답 원인을 체계적으로 분석함으로써 비판적 사고력과 문제 해결력이 매우 돋보임.`;
     
     const fallbackReport = {
       studentEmail,
       studentName,
-      personalizedFeedback: `${studentName} 학생은 EBS 심화영어II 지문 완독 및 소크라테스 튜터 질의를 통해 적극적인 구문 탐구를 수행하였습니다. 특히 2단계 구문 힌트를 효과적으로 활용하여 역접 연결어와 복합 관계사절에 대한 이해도가 지속적으로 향상되고 있습니다.`,
-      schoolRecordSetek: sampleSetek,
-      byteCount: getKoreanByteLength(sampleSetek),
-      keyCompetencies: ['주도적 메타인지 탐구', '논리적 지문 구조 분석', '수능 변형 문제 응용력'],
+      personalizedFeedback: `${studentName} 학생은 영어 지문 완독 및 구문 분석 활동을 통해 주도적인 학습 태도를 확립하였습니다. 특히 지문의 논리적 연결어와 복합 관계사절에 대한 이해도가 지속적으로 향상되고 있으며, 오답 분석을 통한 메타인지 역량이 우수합니다.`,
+      schoolRecordSetek: cleanSampleSetek,
+      byteCount: getKoreanByteLength(cleanSampleSetek),
+      keyCompetencies: ['주도적 메타인지 탐구', '논리적 지문 구조 분석', '심층 구문 추론 역량'],
     };
 
     res.json({ success: true, data: fallbackReport, fallback: true });

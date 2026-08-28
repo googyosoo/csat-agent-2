@@ -50,12 +50,12 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   };
 
   const generateCSVContent = () => {
-    const headers = ['학생이름', '이메일', '접속상태', '최근접속시각', '체류시간(분)', '완료지문수', '변형문제풀이수', '소크라테스질의수', '주요탐구소재'];
+    const headers = ['학생이름', '이메일', '접속상태', '최근접속시각', '체류시간(분)', '완료지문수', '변형문제풀이수', '학습소감및탐구수', '주요탐구소재'];
     const rows = students.map(s => {
       const studentSocraticLogs = socSummaries.filter(
         (soc) => soc.studentEmail.toLowerCase() === s.email.toLowerCase()
       );
-      const mainTopics = studentSocraticLogs.map(l => l.keyTopic || '').filter(Boolean).join('; ') || 'EBS 지문 구문 및 어휘 탐구';
+      const mainTopics = studentSocraticLogs.map(l => l.keyTopic || '').filter(Boolean).join('; ') || '지문 구문 및 핵심 어휘 탐구';
 
       return [
         `"${s.name.replace(/"/g, '""')}"`,
@@ -80,7 +80,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
     const link = document.createElement('a');
     const today = new Date().toISOString().split('T')[0];
     link.setAttribute('href', url);
-    link.setAttribute('download', `2027_EBS_심화영어II_학습실적통계_${today}.csv`);
+    link.setAttribute('download', `영어_학습실적통계_${today}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -88,7 +88,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   };
 
   const handleCopyForGoogleSheets = () => {
-    const headers = ['학생이름', '이메일', '접속상태', '최근접속시각', '체류시간(분)', '완료지문수', '변형문제풀이수', '소크라테스질의수', '주요탐구소재'];
+    const headers = ['학생이름', '이메일', '접속상태', '최근접속시각', '체류시간(분)', '완료지문수', '변형문제풀이수', '학습소감및탐구수', '주요탐구소재'];
     const rows = students.map(s => {
       const studentSocraticLogs = socSummaries.filter(
         (soc) => soc.studentEmail.toLowerCase() === s.email.toLowerCase()
@@ -508,7 +508,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                 </div>
                 <h4 className="text-sm font-bold text-white">수능 전문 AI가 학습자 세특 & 피드백을 작성 중입니다...</h4>
                 <p className="text-xs text-slate-400">
-                  EBS 지문 학습 실적, 소크라테스 3단계 힌트 응용 및 변형문제 성취도를 종합 분석하는 중입니다.
+                  지문 분석 실적, 메타인지 성찰 소감 및 변형문제 성취도를 종합 분석하는 중입니다.
                 </p>
               </div>
             ) : reportResult ? (

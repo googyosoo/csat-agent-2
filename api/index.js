@@ -1335,32 +1335,37 @@ app.post("/api/gemini/student-report", async (req, res) => {
   const body = req.body || {};
   const student = body.student || {};
   const studentEmail = body.studentEmail || student.email || "student@simin.hs.kr";
-  const studentName = body.studentName || student.name || "\uAE40\uD559\uC0DD";
+  const studentName = body.studentName || student.name || "\uD559\uC2B5\uC790";
   const records = body.records || body.socraticLogs || [];
   const customApiKey = body.customApiKey;
-  const prompt = `You are a master High School English Teacher in Korea preparing official School Student Records (\uD559\uAD50\uC0DD\uD65C\uAE30\uB85D\uBD80 \uC138\uBD80\uB2A5\uB825 \uBC0F \uD2B9\uAE30\uC0AC\uD56D).
-Analyze the following student's learning data and generate a personalized learning feedback report AND an official NEIS School Record Setek (\uC138\uD2B9) text.
+  const prompt = `You are an expert Korean High School English Teacher creating official School Life Records (\uD559\uAD50\uC0DD\uD65C\uAE30\uB85D\uBD80 \uAD50\uACFC\uC138\uBD80\uB2A5\uB825 \uBC0F \uD2B9\uAE30\uC0AC\uD56D).
+Analyze the student's study logs and generate a high-quality personalized feedback report AND an official NEIS School Record Setek (\uC138\uD2B9) text.
 
 [Student Activity Data]
 - Name: ${studentName} (${studentEmail})
-- Total Logins: ${student?.loginCount || 1} times
-- Total Study Dwell Time: ${student?.totalDwellTimeMinutes || 25} minutes
-- Learning Records: ${JSON.stringify(records.slice(0, 5))}
+- Total Logins: ${student?.loginCount || 1} \uD68C
+- Study Dwell Time: ${student?.totalDwellTimeMinutes || 25} \uBD84
+- Completed Passages / Questions: ${student?.completedPassagesCount || 1} \uAC74
+- Student Learning Logs & Reflections: ${JSON.stringify(records.slice(0, 5))}
 
-[Instruction Rules for Setek (\uC138\uBD80\uB2A5\uB825 \uBC0F \uD2B9\uAE30\uC0AC\uD56D)]:
-1. TONE & STYLE: Write in official, formal Korean teacher observation style (~\uD568., ~\uC5D0\uC11C \uB450\uAC01\uC744 \uB098\uD0C0\uB0C4., ~\uC744 \uC790\uC728 \uD0D0\uAD6C\uD568.).
-2. CONTENT: Highlight how the student actively utilized 2027 EBS Career English passages, engaged with Socratic 3-step hint tutoring, identified complex syntax (e.g., relative clauses, contrastive discourse markers), and solved CSAT transformed questions. Reflect real study patterns and personal academic traits.
-3. BYTE LENGTH MANDATE: The "schoolRecordSetek" MUST BE STRICTLY BETWEEN 800 AND 900 BYTES in Korean (approximately 270~300 Korean characters with spaces). Do not exceed 950 bytes or be under 750 bytes.
-4. "byteCount" property must hold the exact calculated byte length.
+[CRITICAL INSTRUCTION RULES FOR SETEK (\uC138\uBD80\uB2A5\uB825 \uBC0F \uD2B9\uAE30\uC0AC\uD56D)]:
+1. STRICT FORBIDDEN TERMS (NEVER USE):
+   - DO NOT USE: "2027", "\uC2EC\uD654\uC601\uC5B4II", "\uC18C\uD06C\uB77C\uD14C\uC2A4", "\uC18C\uD06C\uB77C\uD14C\uC2A4 AI\uD29C\uD130", "\uC18C\uD06C\uB77C\uD14C\uC2A4 \uD29C\uD130\uB9C1", "EBS", "\uC218\uB2A5\uC5F0\uACC4", "EBS \uC218\uB2A5 \uC5F0\uACC4", "\uBCC0\uD615\uBB38\uC81C \uC0DD\uC131\uAE30"
+   - Use standard educational terms instead: "\uC601\uC5B4 \uB3C5\uD574 \uBC0F \uC9C0\uBB38 \uBD84\uC11D \uD65C\uB3D9", "\uD14D\uC2A4\uD2B8 \uAD6C\uC870\uD654 \uBC0F \uD575\uC2EC \uAD6C\uBB38 \uD0D0\uAD6C", "\uB17C\uB9AC\uC801 \uD750\uB984 \uBC0F \uBE48\uCE78\xB7\uC5B4\uBC95 \uCD94\uB860 \uBB38\uD56D \uD574\uACB0", "\uC790\uAE30\uC8FC\uB3C4\uC801 \uBA54\uD0C0\uC778\uC9C0 \uD559\uC2B5 \uC18C\uAC10 \uC791\uC131".
 
-Respond ONLY with JSON matching the required schema.`;
+2. TONE & STYLE: Write in official, objective Korean high school teacher record style (~\uD568., ~\uC5D0\uC11C \uB6F0\uC5B4\uB09C \uC5ED\uB7C9\uC744 \uBCF4\uC784., ~\uC744 \uC2A4\uC2A4\uB85C \uB3C4\uCD9C\uD568., ~\uD0DC\uB3C4\uAC00 \uB3CB\uBCF4\uC784.).
+3. CONTENT HIGHLIGHTS: Detail how the student analyzed complex English passages, identified discourse markers and syntactic structures (e.g., participial clauses, conditional sentences, contrasting transitions), resolved inference-based questions, and reflected deeply on their learning processes.
+4. BYTE LENGTH MANDATE: The "schoolRecordSetek" MUST BE STRICTLY BETWEEN 800 AND 900 BYTES (approx. 270~300 Korean characters including spaces).
+5. "byteCount" property must contain the exact byte count.
+
+Respond ONLY with valid JSON matching the schema.`;
   try {
     const ai = getGenAIClient(customApiKey);
     const response = await callGemini(ai, [{ role: "user", parts: [{ text: prompt }] }], {
       responseMimeType: "application/json",
       responseSchema: studentReportSchema,
-      temperature: 0.3
-    });
+      temperature: 0.2
+    }, "flash");
     const responseText = response.text;
     if (!responseText) throw new Error("Empty response from Gemini");
     const resultJson = JSON.parse(cleanJsonString(responseText));
@@ -1368,19 +1373,19 @@ Respond ONLY with JSON matching the required schema.`;
     resultJson.studentName = studentName;
     resultJson.byteCount = getKoreanByteLength(resultJson.schoolRecordSetek || "");
     if (!Array.isArray(resultJson.keyCompetencies)) {
-      resultJson.keyCompetencies = ["\uC8FC\uB3C4\uC801 \uBA54\uD0C0\uC778\uC9C0 \uD0D0\uAD6C", "\uB17C\uB9AC\uC801 \uC9C0\uBB38 \uAD6C\uC870 \uBD84\uC11D", "\uC218\uB2A5 \uBCC0\uD615 \uBB38\uC81C \uC751\uC6A9\uB825"];
+      resultJson.keyCompetencies = ["\uC8FC\uB3C4\uC801 \uBA54\uD0C0\uC778\uC9C0 \uD0D0\uAD6C", "\uB17C\uB9AC\uC801 \uC9C0\uBB38 \uAD6C\uC870 \uBD84\uC11D", "\uC2EC\uCE35 \uAD6C\uBB38 \uCD94\uB860 \uC5ED\uB7C9"];
     }
     res.json({ success: true, data: resultJson });
   } catch (error) {
-    console.info("[Student Report API] Generating intelligent fallback report.");
-    const sampleSetek = `'2027 \uC2EC\uD654\uC601\uC5B4II' \uC9C0\uBB38 \uBD84\uC11D \uC6CC\uD06C\uBD81\uACFC \uC18C\uD06C\uB77C\uD14C\uC2A4 AI \uD29C\uD130\uB97C \uC801\uADF9 \uD65C\uC6A9\uD558\uC5EC \uC601\uC5B4 \uB3C5\uD574\uB825\uACFC \uC9C0\uBB38 \uAD6C\uC870 \uD30C\uC545 \uB2A5\uB825\uC744 \uC885\uD569\uC801\uC73C\uB85C \uC2E0\uC7A5\uD568. \uD2B9\uD788 EBS \uC218\uB2A5 \uC5F0\uACC4 \uC9C0\uBB38 \uD559\uC2B5 \uACFC\uC815\uC5D0\uC11C \uAC00\uC8FC\uC5B4-\uC9C4\uC8FC\uC5B4 \uAD6C\uBB38 \uBC0F \uC5ED\uC811 \uC5F0\uACB0\uC5B4\uB97C \uD1B5\uD55C \uB17C\uC9C0 \uC804\uD658 \uD30C\uC545\uC5D0 \uB0A8\uB2E4\uB978 \uBA54\uD0C0\uC778\uC9C0\uC801 \uD0D0\uAD6C\uC5F4\uC744 \uBCF4\uC784. \uC18C\uD06C\uB77C\uD14C\uC2A4 \uD29C\uD130\uB9C1 3\uB2E8\uACC4 \uD78C\uD2B8 \uC2DC\uC2A4\uD15C\uC744 \uB2E8\uACC4\uBCC4\uB85C \uD0D0\uC0C9\uD558\uBA70 \uC2A4\uC2A4\uB85C \uBB38\uB9E5\uC0C1 \uC5B4\uD718\uC758 \uD568\uCD95\uC801 \uC758\uBBF8\uB97C \uB3C4\uCD9C\uD574\uB0B4\uB294 \uC8FC\uB3C4\uC801\uC778 \uD559\uC2B5 \uD0DC\uB3C4\uB97C \uD615\uC131\uD568. \uC218\uB2A5 \uBCC0\uD615\uBB38\uC81C \uC0DD\uC131\uAE30 \uAE30\uB2A5\uC744 \uC751\uC6A9\uD558\uC5EC \uBE48\uCE78 \uCD94\uB860 \uBC0F \uC5B4\uBC95\uC131 \uD310\uB2E8 \uBB38\uD56D\uC744\uC9C1\uC811 \uD480\uC774\uD558\uACE0 \uBD84\uC11D\uD568\uC73C\uB85C\uC368 \uD14D\uC2A4\uD2B8\uC758 \uB17C\uB9AC\uC801 \uACB0\uC18D\uC131\uC744 \uD30C\uC545\uD558\uB294 \uBE44\uD310\uC801 \uC0AC\uACE0\uB825\uC774 \uB9E4\uC6B0 \uC6B0\uC218\uD568.`;
+    console.info("[Student Report API] Generating clean educational fallback report:", error?.message || error);
+    const cleanSampleSetek = `\uC601\uC5B4 \uC9C0\uBB38 \uC2EC\uCE35 \uBD84\uC11D \uC6CC\uD06C\uBD81 \uD559\uC2B5 \uD65C\uB3D9\uC5D0 \uC131\uC2E4\uD788 \uCC38\uC5EC\uD558\uC5EC \uACE0\uAE09 \uC601\uC5B4 \uD14D\uC2A4\uD2B8\uC758 \uB9E5\uB77D\uC801 \uB3C5\uD574\uB825\uACFC \uB17C\uB9AC\uC801 \uC9C0\uBB38 \uAD6C\uC870 \uD30C\uC545 \uB2A5\uB825\uC744 \uC885\uD569\uC801\uC73C\uB85C \uC2E0\uC7A5\uD568. \uD2B9\uD788 \uC9C0\uBB38 \uBD84\uC11D \uACFC\uC815\uC5D0\uC11C \uAC00\uC8FC\uC5B4-\uC9C4\uC8FC\uC5B4 \uAD6C\uBB38 \uBC0F \uC5ED\uC811 \uC5F0\uACB0\uC5B4\uB97C \uD1B5\uD55C \uB17C\uC9C0 \uC804\uD658 \uD30C\uC545\uC5D0 \uB0A8\uB2E4\uB978 \uD0D0\uAD6C\uC5F4\uC744 \uBCF4\uC774\uBA70 \uBB38\uC7A5 \uAC04 \uACB0\uC18D\uC131\uC744 \uCE58\uBC00\uD558\uAC8C \uBD84\uC11D\uD568. \uC2A4\uC2A4\uB85C \uBB38\uB9E5\uC0C1 \uC5B4\uD718\uC758 \uD568\uCD95\uC801 \uC758\uBBF8\uB97C \uB3C4\uCD9C\uD558\uACE0 \uCDE8\uC57D \uAD6C\uBB38\uC5D0 \uB300\uD55C \uBA54\uD0C0\uC778\uC9C0\uC801 \uD559\uC2B5 \uC18C\uAC10\uC744 \uC791\uC131\uD558\uC5EC \uC790\uAE30\uC8FC\uB3C4\uC801\uC778 \uD559\uC2B5 \uD0DC\uB3C4\uB97C \uD615\uC131\uD568. \uBE48\uCE78 \uCD94\uB860 \uBC0F \uC5B4\uBC95 \uD310\uB2E8 \uB4F1 \uACE0\uB09C\uB3C4 \uBCC0\uD615 \uBB38\uD56D\uC744 \uC8FC\uB3C4\uC801\uC73C\uB85C \uD480\uC774\uD558\uACE0 \uC624\uB2F5 \uC6D0\uC778\uC744 \uCCB4\uACC4\uC801\uC73C\uB85C \uBD84\uC11D\uD568\uC73C\uB85C\uC368 \uBE44\uD310\uC801 \uC0AC\uACE0\uB825\uACFC \uBB38\uC81C \uD574\uACB0\uB825\uC774 \uB9E4\uC6B0 \uB3CB\uBCF4\uC784.`;
     const fallbackReport = {
       studentEmail,
       studentName,
-      personalizedFeedback: `${studentName} \uD559\uC0DD\uC740 EBS \uC2EC\uD654\uC601\uC5B4II \uC9C0\uBB38 \uC644\uB3C5 \uBC0F \uC18C\uD06C\uB77C\uD14C\uC2A4 \uD29C\uD130 \uC9C8\uC758\uB97C \uD1B5\uD574 \uC801\uADF9\uC801\uC778 \uAD6C\uBB38 \uD0D0\uAD6C\uB97C \uC218\uD589\uD558\uC600\uC2B5\uB2C8\uB2E4. \uD2B9\uD788 2\uB2E8\uACC4 \uAD6C\uBB38 \uD78C\uD2B8\uB97C \uD6A8\uACFC\uC801\uC73C\uB85C \uD65C\uC6A9\uD558\uC5EC \uC5ED\uC811 \uC5F0\uACB0\uC5B4\uC640 \uBCF5\uD569 \uAD00\uACC4\uC0AC\uC808\uC5D0 \uB300\uD55C \uC774\uD574\uB3C4\uAC00 \uC9C0\uC18D\uC801\uC73C\uB85C \uD5A5\uC0C1\uB418\uACE0 \uC788\uC2B5\uB2C8\uB2E4.`,
-      schoolRecordSetek: sampleSetek,
-      byteCount: getKoreanByteLength(sampleSetek),
-      keyCompetencies: ["\uC8FC\uB3C4\uC801 \uBA54\uD0C0\uC778\uC9C0 \uD0D0\uAD6C", "\uB17C\uB9AC\uC801 \uC9C0\uBB38 \uAD6C\uC870 \uBD84\uC11D", "\uC218\uB2A5 \uBCC0\uD615 \uBB38\uC81C \uC751\uC6A9\uB825"]
+      personalizedFeedback: `${studentName} \uD559\uC0DD\uC740 \uC601\uC5B4 \uC9C0\uBB38 \uC644\uB3C5 \uBC0F \uAD6C\uBB38 \uBD84\uC11D \uD65C\uB3D9\uC744 \uD1B5\uD574 \uC8FC\uB3C4\uC801\uC778 \uD559\uC2B5 \uD0DC\uB3C4\uB97C \uD655\uB9BD\uD558\uC600\uC2B5\uB2C8\uB2E4. \uD2B9\uD788 \uC9C0\uBB38\uC758 \uB17C\uB9AC\uC801 \uC5F0\uACB0\uC5B4\uC640 \uBCF5\uD569 \uAD00\uACC4\uC0AC\uC808\uC5D0 \uB300\uD55C \uC774\uD574\uB3C4\uAC00 \uC9C0\uC18D\uC801\uC73C\uB85C \uD5A5\uC0C1\uB418\uACE0 \uC788\uC73C\uBA70, \uC624\uB2F5 \uBD84\uC11D\uC744 \uD1B5\uD55C \uBA54\uD0C0\uC778\uC9C0 \uC5ED\uB7C9\uC774 \uC6B0\uC218\uD569\uB2C8\uB2E4.`,
+      schoolRecordSetek: cleanSampleSetek,
+      byteCount: getKoreanByteLength(cleanSampleSetek),
+      keyCompetencies: ["\uC8FC\uB3C4\uC801 \uBA54\uD0C0\uC778\uC9C0 \uD0D0\uAD6C", "\uB17C\uB9AC\uC801 \uC9C0\uBB38 \uAD6C\uC870 \uBD84\uC11D", "\uC2EC\uCE35 \uAD6C\uBB38 \uCD94\uB860 \uC5ED\uB7C9"]
     };
     res.json({ success: true, data: fallbackReport, fallback: true });
   }
