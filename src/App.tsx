@@ -15,7 +15,7 @@ import { LandingPage } from './components/LandingPage';
 import { subscribeToAuth, logout, User } from './lib/firebase';
 import { validateUserAccess, ALLOWED_STUDENT_DOMAIN, ADMIN_EMAILS } from './lib/adminAuth';
 
-import { recordUserLogin } from './lib/analytics';
+import { recordUserLogin, autoSyncAllLocalDataToCloud } from './lib/analytics';
 
 export default function App() {
   const [dataset, setDataset] = useState<EBSPassage[]>(INITIAL_EBS_DATASET);
@@ -31,6 +31,11 @@ export default function App() {
   const [isGuestPreview, setIsGuestPreview] = useState(false);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // 0. Auto-sync any local data (logged-in or guest/offline) to cloud immediately on app startup
+  useEffect(() => {
+    autoSyncAllLocalDataToCloud();
+  }, []);
 
   // 1. Listen to Firebase Authentication state (mounted once)
   useEffect(() => {
