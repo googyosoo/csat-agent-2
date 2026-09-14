@@ -20,6 +20,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 }) => {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [metacognitionInput, setMetacognitionInput] = useState('');
+  const [guestAuthorName, setGuestAuthorName] = useState('');
   const [isSavingSummary, setIsSavingSummary] = useState(false);
   const [summarySuccessMsg, setSummarySuccessMsg] = useState('');
 
@@ -322,78 +323,110 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             </div>
           </div>
 
-          {!authUser ? (
-            <div className="bg-slate-950/90 border border-rose-500/40 p-5 rounded-xl text-center space-y-3">
-              <div className="flex items-center justify-center space-x-2 text-rose-400 font-extrabold text-sm">
-                <i className="fa-solid fa-lock"></i>
-                <span>🔒 학생 메타인지 소감 및 생기부 성찰 기록은 Google 로그인 후 작성 가능합니다.</span>
+          <div className="space-y-3">
+            {summarySuccessMsg && (
+              <div className="p-3 bg-emerald-950/80 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs font-bold flex items-center justify-between">
+                <span>{summarySuccessMsg}</span>
+                <button onClick={() => setSummarySuccessMsg('')} className="text-emerald-400 hover:text-white">✕</button>
               </div>
-              <p className="text-xs text-slate-400">
-                심인고등학교 학생 계정(<code className="text-cyan-300">@simin.hs.kr</code>) 또는 지정 관리자 계정으로 Google 로그인 후 소감을 작성하실 수 있습니다.
-              </p>
-              <button
-                type="button"
-                onClick={() => signInWithGoogle().catch(console.error)}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all"
-              >
-                <i className="fa-brands fa-google mr-1.5"></i>
-                Google 로그인하기
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {summarySuccessMsg && (
-                <div className="p-3 bg-emerald-950/80 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs font-bold flex items-center justify-between">
-                  <span>{summarySuccessMsg}</span>
-                  <button onClick={() => setSummarySuccessMsg('')} className="text-emerald-400 hover:text-white">✕</button>
+            )}
+
+            {!authUser && (
+              <div className="bg-slate-950/90 border border-purple-500/30 p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center space-x-2 text-purple-300">
+                  <i className="fa-solid fa-circle-info"></i>
+                  <span>미로그인 상태입니다. 학번과 이름을 입력하여 바로 소감을 남길 수 있습니다.</span>
                 </div>
-              )}
-              <textarea
-                value={metacognitionInput}
-                onChange={(e) => setMetacognitionInput(e.target.value)}
-                placeholder={`[${selectedPassage.lesson} ${selectedPassage.itemNo} - ${selectedPassage.title}] 지문을 풀면서 파악한 핵심 구문 구조, 정답/오답의 직관적 원인, 세특 반영 소감을 적어보세요...`}
-                rows={4}
-                className="w-full bg-slate-950 text-slate-100 text-xs rounded-xl p-3.5 border border-slate-800 focus:outline-none focus:border-purple-500 font-sans leading-relaxed resize-none"
-              />
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-400">
-                  작성자: <strong className="text-slate-200">{authUser.displayName || authUser.email}</strong>
-                </span>
                 <button
                   type="button"
-                  disabled={!metacognitionInput.trim() || isSavingSummary}
-                  onClick={async () => {
-                    if (!metacognitionInput.trim()) return;
-                    setIsSavingSummary(true);
-                    try {
-                      const studentEmail = authUser.email || 'guest_student@simin.hs.kr';
-                      const studentName = authUser.displayName || (studentEmail.includes('@') ? studentEmail.split('@')[0] : '학습자');
-
-                      await recordSocraticQuestion({
-                        studentEmail,
-                        studentName,
-                        passageTitle: selectedPassage.title,
-                        lesson: selectedPassage.lesson,
-                        itemNo: selectedPassage.itemNo,
-                        questionText: metacognitionInput.trim(),
-                        hintLevel: 1,
-                      });
-
-                      setSummarySuccessMsg('🎉 학생의 메타인지 소감이 관리자 대시보드 및 마이 대시보드에 즉시 저장 및 연동되었습니다!');
-                      setMetacognitionInput('');
-                    } catch (err: any) {
-                      alert(`저장 중 오류가 발생했습니다: ${err?.message || err}`);
-                    } finally {
-                      setIsSavingSummary(false);
-                    }
-                  }}
-                  className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all disabled:opacity-40"
+                  onClick={() => signInWithGoogle().catch(console.error)}
+                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-bold text-[11px] shrink-0 transition-all flex items-center space-x-1"
                 >
-                  {isSavingSummary ? '저장 중...' : '소감 제출 및 세특 저장'}
+                  <i className="fa-brands fa-google text-blue-400"></i>
+                  <span>Google 로그인하기</span>
                 </button>
               </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              {!authUser ? (
+                <div className="flex-1">
+                  <label className="text-[11px] text-slate-400 font-bold block mb-1">
+                    학번 및 이름 <span className="text-purple-400">(미입력 시 '학습자 (미로그인 게스트)'로 등록)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={guestAuthorName}
+                    onChange={(e) => setGuestAuthorName(e.target.value)}
+                    placeholder="예: 20106 강태윤"
+                    className="w-full bg-slate-950 text-slate-100 text-xs rounded-xl px-3 py-2 border border-slate-800 focus:outline-none focus:border-purple-500 font-medium"
+                  />
+                </div>
+              ) : (
+                <div className="text-xs text-slate-300 flex items-center space-x-2 py-1">
+                  <span className="text-slate-400">작성자:</span>
+                  <strong className="text-purple-300">{authUser.displayName || authUser.email}</strong>
+                  <span className="px-2 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30">Google 인증됨</span>
+                </div>
+              )}
             </div>
-          )}
+
+            <textarea
+              value={metacognitionInput}
+              onChange={(e) => setMetacognitionInput(e.target.value)}
+              placeholder={`[${selectedPassage.lesson} ${selectedPassage.itemNo} - ${selectedPassage.title}] 지문을 풀면서 파악한 핵심 구문 구조, 정답/오답의 직관적 원인, 세특 반영 소감을 적어보세요...`}
+              rows={4}
+              className="w-full bg-slate-950 text-slate-100 text-xs rounded-xl p-3.5 border border-slate-800 focus:outline-none focus:border-purple-500 font-sans leading-relaxed resize-none"
+            />
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[11px] text-slate-500">
+                제출 시 교사 대시보드 [✍️ 학생별 지문 학습 소감 모아보기]에 실시간으로 등록됩니다.
+              </span>
+              <button
+                type="button"
+                disabled={!metacognitionInput.trim() || isSavingSummary}
+                onClick={async () => {
+                  if (!metacognitionInput.trim()) return;
+                  setIsSavingSummary(true);
+                  try {
+                    const cleanGuest = guestAuthorName.trim();
+                    const studentName = authUser?.displayName || (cleanGuest || '학습자 (미로그인 게스트)');
+                    const studentEmail = authUser?.email || (cleanGuest ? `${cleanGuest.replace(/\s+/g, '_')}@simin.hs.kr` : 'guest_student@simin.hs.kr');
+
+                    await recordSocraticQuestion({
+                      studentEmail,
+                      studentName,
+                      passageTitle: selectedPassage.title,
+                      lesson: selectedPassage.lesson,
+                      itemNo: selectedPassage.itemNo,
+                      questionText: metacognitionInput.trim(),
+                      hintLevel: 1,
+                    });
+
+                    setSummarySuccessMsg(`🎉 [${studentName}] 님의 학습 소감이 교사 대시보드 및 마이 대시보드에 즉시 저장되었습니다!`);
+                    setMetacognitionInput('');
+                  } catch (err: any) {
+                    alert(`저장 중 오류가 발생했습니다: ${err?.message || err}`);
+                  } finally {
+                    setIsSavingSummary(false);
+                  }
+                }}
+                className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all disabled:opacity-40 flex items-center space-x-1.5"
+              >
+                {isSavingSummary ? (
+                  <>
+                    <i className="fa-solid fa-spinner fa-spin"></i>
+                    <span>저장 중...</span>
+                  </>
+                ) : (
+                  <>
+                    <i className="fa-solid fa-paper-plane"></i>
+                    <span>소감 제출 및 교사 대시보드 전송</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

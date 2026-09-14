@@ -33,12 +33,16 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
     autoSyncAllLocalDataToCloud();
 
     // 2. Hydrate from server & Firestore & Local
-    const localSoc = getStoredSocraticSummaries().filter(
-      (s) => (s.studentEmail || '').toLowerCase().trim() === currentEmail
-    );
-    const localEv = getStoredLearningEvents().filter(
-      (e) => (e.studentEmail || '').toLowerCase().trim() === currentEmail
-    );
+    const allLocalSoc = getStoredSocraticSummaries();
+    const allLocalEv = getStoredLearningEvents();
+
+    const localSoc = authUser
+      ? allLocalSoc.filter((s) => (s.studentEmail || '').toLowerCase().trim() === currentEmail)
+      : allLocalSoc;
+
+    const localEv = authUser
+      ? allLocalEv.filter((e) => (e.studentEmail || '').toLowerCase().trim() === currentEmail)
+      : allLocalEv;
 
     try {
       const serverData = await fetchServerAnalyticsData();
@@ -48,12 +52,13 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
       if (matched) {
         currentRecord = { ...currentRecord, ...matched };
       }
-      const filteredSoc = serverData.socraticLogs.filter(
-        (s) => (s.studentEmail || '').toLowerCase().trim() === currentEmail
-      );
-      const filteredEv = serverData.learningEvents.filter(
-        (e) => (e.studentEmail || '').toLowerCase().trim() === currentEmail
-      );
+      const filteredSoc = authUser
+        ? serverData.socraticLogs.filter((s) => (s.studentEmail || '').toLowerCase().trim() === currentEmail)
+        : serverData.socraticLogs;
+
+      const filteredEv = authUser
+        ? serverData.learningEvents.filter((e) => (e.studentEmail || '').toLowerCase().trim() === currentEmail)
+        : serverData.learningEvents;
 
       // Merge server and local without duplicates
       const mergedSocMap = new Map<string, SocraticSummary>();

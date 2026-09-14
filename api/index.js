@@ -54,6 +54,114 @@ function loadAnalyticsFromFile() {
   }
   return { students: [], socraticLogs: [], learningEvents: [], transformedQuestions: [] };
 }
+var SERVER_SEED_STUDENTS = [
+  {
+    id: "std-20101-minjun",
+    email: "20101_minjun@simin.hs.kr",
+    name: "20101 \uAE40\uBBFC\uC900",
+    loginCount: 14,
+    lastLogin: new Date(Date.now() - 1e3 * 60 * 12).toLocaleString("ko-KR"),
+    totalDwellTimeMinutes: 84,
+    completedPassagesCount: 8,
+    transformedQuestionsGenerated: 15,
+    quizAccuracyPercentage: 92,
+    socraticQuestionsCount: 4,
+    status: "online"
+  },
+  {
+    id: "std-20102-seoyeon",
+    email: "20102_seoyeon@simin.hs.kr",
+    name: "20102 \uC774\uC11C\uC5F0",
+    loginCount: 19,
+    lastLogin: new Date(Date.now() - 1e3 * 60 * 28).toLocaleString("ko-KR"),
+    totalDwellTimeMinutes: 110,
+    completedPassagesCount: 12,
+    transformedQuestionsGenerated: 22,
+    quizAccuracyPercentage: 96,
+    socraticQuestionsCount: 5,
+    status: "online"
+  },
+  {
+    id: "std-20103-dohyun",
+    email: "20103_dohyun@simin.hs.kr",
+    name: "20103 \uBC15\uB3C4\uD604",
+    loginCount: 9,
+    lastLogin: new Date(Date.now() - 1e3 * 60 * 45).toLocaleString("ko-KR"),
+    totalDwellTimeMinutes: 62,
+    completedPassagesCount: 6,
+    transformedQuestionsGenerated: 11,
+    quizAccuracyPercentage: 88,
+    socraticQuestionsCount: 3,
+    status: "offline"
+  },
+  {
+    id: "std-guest-simin",
+    email: "guest_student@simin.hs.kr",
+    name: "\uD559\uC2B5\uC790 (\uBBF8\uB85C\uADF8\uC778 \uAC8C\uC2A4\uD2B8)",
+    loginCount: 5,
+    lastLogin: new Date(Date.now() - 1e3 * 60 * 5).toLocaleString("ko-KR"),
+    totalDwellTimeMinutes: 35,
+    completedPassagesCount: 4,
+    transformedQuestionsGenerated: 6,
+    quizAccuracyPercentage: 89,
+    socraticQuestionsCount: 2,
+    status: "online"
+  }
+];
+var SERVER_SEED_SOCRATIC = [
+  {
+    id: "soc-seed-01",
+    studentEmail: "guest_student@simin.hs.kr",
+    studentName: "\uD559\uC2B5\uC790 (\uBBF8\uB85C\uADF8\uC778 \uAC8C\uC2A4\uD2B8)",
+    passageTitle: "\uB9AC\uC5BC\uB9AC\uC998 \uC18C\uC124\uACFC \uD5C8\uAD6C\uC801 \uC0AC\uC2E4\uC758 \uC131\uACA9",
+    lesson: "\uC2E4\uC804 \uBAA8\uC758\uACE0\uC0AC 3\uD68C",
+    itemNo: "29\uBC88 (p.131)",
+    timestamp: new Date(Date.now() - 1e3 * 60 * 6).toLocaleString("ko-KR"),
+    studentQuestionSnippet: "\uC2E4\uC81C \uBCF4\uACE0\uC11C\uB97C \uADF8\uB300\uB85C \uAC00\uC838\uC640 \uC18C\uC124\uC774\uB77C\uACE0 \uBA85\uBA85\uD558\uB294 \uC21C\uAC04 \uB3C5\uC790\uC758 \uD0DC\uB3C4\uAC00 \uC0AC\uC2E4 \uC5EC\uBD80(factual truth)\uC5D0\uC11C \uBCF4\uD3B8\uC801 \uB3C4\uB355 \uC9C4\uB9AC(general moral truth)\uB97C \uCC3E\uB294 \uAC83\uC73C\uB85C \uC804\uD658\uB41C\uB2E4\uB294 \uB9C8\uC9C0\uB9C9 \uBB38\uC7A5\uC774 \uD070 \uC6B8\uB9BC\uC744 \uC8FC\uC5C8\uC2B5\uB2C8\uB2E4. \uBB38\uD559\uC758 \uBCF8\uC9C8\uC801 \uAC00\uCE58\uC5D0 \uB300\uD574 \uB2E4\uC2DC \uC0DD\uAC01\uD574 \uBCF4\uAC8C \uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+    aiHintLevel: 1,
+    keyTopic: "\uC2E4\uC804 3\uD68C 29\uBC88 \uD5C8\uAD6C\uC801 \uBA85\uC81C\uC640 \uB3C4\uB355\uC801 \uC9C4\uB9AC \uD0D0\uAD6C",
+    metacognitiveStatus: "\uC6B0\uC218 (\uAD6C\uBB38 \uD30C\uC545 \uC131\uACF5)"
+  },
+  {
+    id: "soc-seed-02",
+    studentEmail: "20101_minjun@simin.hs.kr",
+    studentName: "20101 \uAE40\uBBFC\uC900",
+    passageTitle: "\uB180\uC774\uC640 \uC77C\uC758 \uACBD\uACC4 \uBC0F \uAE30\uC900 \uCDA9\uC871\uC758 \uBB38\uC81C",
+    lesson: "\uC2E4\uC804 \uBAA8\uC758\uACE0\uC0AC 3\uD68C",
+    itemNo: "30\uBC88 (p.131)",
+    timestamp: new Date(Date.now() - 1e3 * 60 * 18).toLocaleString("ko-KR"),
+    studentQuestionSnippet: '\uC544\uB9AC\uC2A4\uD1A0\uD154\uB808\uC2A4\uAC00 \uC9C0\uC801\uD55C "\uAE30\uC900 \uCDA9\uC871\uC5D0 \uB300\uD55C \uAD00\uC2EC\uC774 \uACFC\uB3C4\uD574\uC9C8 \uB54C \uB180\uC774\uAC00 \uB178\uB3D9\uC73C\uB85C \uBCC0\uC9C8\uB41C\uB2E4"\uB294 \uACB0\uB860\uBD80\uAC00 \uC778\uC0C1 \uAE4A\uC5C8\uC2B5\uB2C8\uB2E4. 5\uBC88 moderate\uAC00 \uBB38\uB9E5\uC0C1 \uACFC\uB3C4\uD55C \uC9D1\uCC29\uC744 \uB73B\uD558\uB294 excessive\uB85C \uBC14\uB00C\uC5B4\uC57C \uC815\uB2F5\uC774\uB77C\uB294 \uAC83\uC744 \uB3C4\uCD9C\uD588\uC2B5\uB2C8\uB2E4. \uBC30\uC6C0\uC758 \uC990\uAC70\uC6C0\uC744 \uC783\uC9C0 \uC54A\uB294 \uD559\uC2B5 \uD0DC\uB3C4\uB97C \uC720\uC9C0\uD574\uC57C\uACA0\uB2E4\uACE0 \uB290\uAF08\uC2B5\uB2C8\uB2E4.',
+    aiHintLevel: 1,
+    keyTopic: "\uC2E4\uC804 3\uD68C 30\uBC88 \uB180\uC774\uC758 \uBCF8\uC9C8\uACFC \uBCC0\uC9C8 \uC6D0\uC778 \uBD84\uC11D",
+    metacognitiveStatus: "\uC6B0\uC218 (\uAD6C\uBB38 \uD30C\uC545 \uC131\uACF5)"
+  },
+  {
+    id: "soc-seed-03",
+    studentEmail: "20102_seoyeon@simin.hs.kr",
+    studentName: "20102 \uC774\uC11C\uC5F0",
+    passageTitle: "\uB9AC\uC5BC\uB9AC\uC998 \uC18C\uC124\uACFC \uD5C8\uAD6C\uC801 \uC0AC\uC2E4\uC758 \uC131\uACA9",
+    lesson: "\uC2E4\uC804 \uBAA8\uC758\uACE0\uC0AC 3\uD68C",
+    itemNo: "29\uBC88 (p.131)",
+    timestamp: new Date(Date.now() - 1e3 * 60 * 32).toLocaleString("ko-KR"),
+    studentQuestionSnippet: 'A\uBC88 \uB300\uB3D9\uC0AC \uBB38\uC81C\uC5D0\uC11C "Lies are designed to deceive, whereas Lord of the Flies is not"\uC758 is\uAC00 \uB300\uB3D9\uC0AC\uB85C \uC4F0\uC778 \uC6D0\uB9AC\uB97C \uC774\uD574\uD588\uC2B5\uB2C8\uB2E4. \uC77C\uBC18\uB3D9\uC0AC deceive\uC758 \uB300\uB3D9\uC0AC\uB85C does\uB97C \uC4F8 \uBED4\uD588\uC73C\uB098 \uC218\uB3D9\uD0DC be designed\uB97C \uBC1B\uC544\uC57C \uD55C\uB2E4\uB294 \uAC83\uC744 \uD30C\uC545\uD588\uC2B5\uB2C8\uB2E4. \uC138\uD2B9 \uD0D0\uAD6C\uB85C "\uBB38\uD559 \uD14D\uC2A4\uD2B8\uC758 \uD5C8\uAD6C\uC131 \uBA85\uC81C\uC640 \uC5B8\uC5B4\uCCA0\uD559"\uC744 \uC5F0\uACC4\uD558\uACE0 \uC2F6\uC2B5\uB2C8\uB2E4.',
+    aiHintLevel: 1,
+    keyTopic: "\uC2E4\uC804 3\uD68C 29\uBC88 \uB300\uB3D9\uC0AC be/do \uD310\uBCC4 \uBC0F \uD5C8\uAD6C\uBA85\uC81C \uD0D0\uAD6C",
+    metacognitiveStatus: "\uC6B0\uC218 (\uAD6C\uBB38 \uD30C\uC545 \uC131\uACF5)"
+  },
+  {
+    id: "soc-seed-04",
+    studentEmail: "20103_dohyun@simin.hs.kr",
+    studentName: "20103 \uBC15\uB3C4\uD604",
+    passageTitle: "\uB180\uC774\uC640 \uC77C\uC758 \uACBD\uACC4 \uBC0F \uAE30\uC900 \uCDA9\uC871\uC758 \uBB38\uC81C",
+    lesson: "\uC2E4\uC804 \uBAA8\uC758\uACE0\uC0AC 3\uD68C",
+    itemNo: "30\uBC88 (p.131)",
+    timestamp: new Date(Date.now() - 1e3 * 60 * 50).toLocaleString("ko-KR"),
+    studentQuestionSnippet: 'Henry Curtis\uC758 "\uB180\uC774\uAC00 \uC5F0\uC2B5\uC758 \uB3D9\uAE30\uB97C \uBD80\uC5EC\uD55C\uB2E4"\uB294 \uC8FC\uC7A5\uC744 \uC77D\uACE0 \uC57C\uAD6C \uC120\uC218\uC758 \uACE0\uB41C \uC5F0\uC2B5\uC774 \uB180\uC774\uC801 \uB3D9\uAE30\uC5D0\uC11C \uBE44\uB86F\uB41C\uB2E4\uB294 \uC810\uC5D0 \uACF5\uAC10\uD588\uC2B5\uB2C8\uB2E4. delayed reward(\uC9C0\uC5F0\uB41C \uBCF4\uC0C1) \uAC1C\uB150\uACFC \uACB0\uBD80\uD558\uC5EC \uC2EC\uB9AC\uD559\uC801 \uAD00\uC810\uC5D0\uC11C \uC9C0\uBB38\uC744 \uBD84\uC11D\uD574 \uBCF4\uC558\uC2B5\uB2C8\uB2E4.',
+    aiHintLevel: 2,
+    keyTopic: "\uC2E4\uC804 3\uD68C 30\uBC88 \uC9C0\uC5F0\uB41C \uBCF4\uC0C1\uACFC \uB0B4\uC801 \uB3D9\uAE30 \uBD84\uC11D",
+    metacognitiveStatus: "\uBCF4\uD1B5 (\uD78C\uD2B8 \uC720\uB3C4 \uD544\uC694)"
+  }
+];
 function saveAnalyticsToFile(data) {
   try {
     const existing = loadAnalyticsFromFile();
@@ -70,10 +178,18 @@ function saveAnalyticsToFile(data) {
 }
 var initialStore = loadAnalyticsFromFile();
 var globalStudentsMap = /* @__PURE__ */ new Map();
+SERVER_SEED_STUDENTS.forEach((s) => {
+  globalStudentsMap.set(s.email.toLowerCase().trim(), s);
+});
 initialStore.students.forEach((s) => {
   if (s && s.email) globalStudentsMap.set(s.email.toLowerCase().trim(), s);
 });
-var globalSocraticLogs = initialStore.socraticLogs;
+var socMap = /* @__PURE__ */ new Map();
+SERVER_SEED_SOCRATIC.forEach((s) => socMap.set(s.id, s));
+(initialStore.socraticLogs || []).forEach((s) => {
+  if (s && s.id) socMap.set(s.id, s);
+});
+var globalSocraticLogs = Array.from(socMap.values());
 var globalLearningEvents = initialStore.learningEvents;
 var globalTransformedQuestions = initialStore.transformedQuestions || [];
 app.post("/api/analytics/sync", (req, res) => {
@@ -167,11 +283,11 @@ app.get("/api/analytics/data", (req, res) => {
         }
       }
     });
-    const socMap = /* @__PURE__ */ new Map();
+    const socMap2 = /* @__PURE__ */ new Map();
     [...fileStore.socraticLogs, ...globalSocraticLogs].forEach((l) => {
-      if (l && l.id) socMap.set(l.id, l);
+      if (l && l.id) socMap2.set(l.id, l);
     });
-    globalSocraticLogs = Array.from(socMap.values());
+    globalSocraticLogs = Array.from(socMap2.values());
     const evtMap = /* @__PURE__ */ new Map();
     [...fileStore.learningEvents, ...globalLearningEvents].forEach((e) => {
       if (e && e.id) evtMap.set(e.id, e);

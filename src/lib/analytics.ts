@@ -48,6 +48,181 @@ const STORAGE_KEY_STUDENTS = 'csat_analytics_students_v1';
 const STORAGE_KEY_SOCRATIC = 'csat_analytics_socratic_v1';
 const STORAGE_KEY_LEARNING_EVENTS = 'csat_analytics_learning_events_v1';
 
+export const INITIAL_STUDENTS: StudentActivity[] = [
+  {
+    id: 'std-20101-minjun',
+    email: '20101_minjun@simin.hs.kr',
+    name: '20101 김민준',
+    loginCount: 14,
+    lastLogin: new Date(Date.now() - 1000 * 60 * 12).toLocaleString('ko-KR'),
+    totalDwellTimeMinutes: 84,
+    completedPassagesCount: 8,
+    transformedQuestionsGenerated: 15,
+    quizAccuracyPercentage: 92,
+    socraticQuestionsCount: 4,
+    status: 'online',
+  },
+  {
+    id: 'std-20102-seoyeon',
+    email: '20102_seoyeon@simin.hs.kr',
+    name: '20102 이서연',
+    loginCount: 19,
+    lastLogin: new Date(Date.now() - 1000 * 60 * 28).toLocaleString('ko-KR'),
+    totalDwellTimeMinutes: 110,
+    completedPassagesCount: 12,
+    transformedQuestionsGenerated: 22,
+    quizAccuracyPercentage: 96,
+    socraticQuestionsCount: 5,
+    status: 'online',
+  },
+  {
+    id: 'std-20103-dohyun',
+    email: '20103_dohyun@simin.hs.kr',
+    name: '20103 박도현',
+    loginCount: 9,
+    lastLogin: new Date(Date.now() - 1000 * 60 * 45).toLocaleString('ko-KR'),
+    totalDwellTimeMinutes: 62,
+    completedPassagesCount: 6,
+    transformedQuestionsGenerated: 11,
+    quizAccuracyPercentage: 88,
+    socraticQuestionsCount: 3,
+    status: 'offline',
+  },
+  {
+    id: 'std-20104-jiwoo',
+    email: '20104_jiwoo@simin.hs.kr',
+    name: '20104 최지우',
+    loginCount: 11,
+    lastLogin: new Date(Date.now() - 1000 * 60 * 75).toLocaleString('ko-KR'),
+    totalDwellTimeMinutes: 75,
+    completedPassagesCount: 7,
+    transformedQuestionsGenerated: 14,
+    quizAccuracyPercentage: 90,
+    socraticQuestionsCount: 2,
+    status: 'offline',
+  },
+  {
+    id: 'std-20105-yeeun',
+    email: '20105_yeeun@simin.hs.kr',
+    name: '20105 정예은',
+    loginCount: 8,
+    lastLogin: new Date(Date.now() - 1000 * 60 * 120).toLocaleString('ko-KR'),
+    totalDwellTimeMinutes: 53,
+    completedPassagesCount: 5,
+    transformedQuestionsGenerated: 9,
+    quizAccuracyPercentage: 85,
+    socraticQuestionsCount: 2,
+    status: 'offline',
+  },
+  {
+    id: 'std-guest-simin',
+    email: 'guest_student@simin.hs.kr',
+    name: '학습자 (미로그인 게스트)',
+    loginCount: 5,
+    lastLogin: new Date(Date.now() - 1000 * 60 * 5).toLocaleString('ko-KR'),
+    totalDwellTimeMinutes: 35,
+    completedPassagesCount: 4,
+    transformedQuestionsGenerated: 6,
+    quizAccuracyPercentage: 89,
+    socraticQuestionsCount: 2,
+    status: 'online',
+  },
+];
+
+export const INITIAL_SOCRATIC_SUMMARIES: SocraticSummary[] = [
+  {
+    id: 'soc-seed-01',
+    studentEmail: 'guest_student@simin.hs.kr',
+    studentName: '학습자 (미로그인 게스트)',
+    passageTitle: '리얼리즘 소설과 허구적 사실의 성격',
+    lesson: '실전 모의고사 3회',
+    itemNo: '29번 (p.131)',
+    timestamp: new Date(Date.now() - 1000 * 60 * 6).toLocaleString('ko-KR'),
+    studentQuestionSnippet: '실제 보고서를 그대로 가져와 소설이라고 명명하는 순간 독자의 태도가 사실 여부(factual truth)에서 보편적 도덕 진리(general moral truth)를 찾는 것으로 전환된다는 마지막 문장이 큰 울림을 주었습니다. 문학의 본질적 가치에 대해 다시 생각해 보게 되었습니다.',
+    aiHintLevel: 1,
+    keyTopic: '실전 3회 29번 허구적 명제와 도덕적 진리 탐구',
+    metacognitiveStatus: '우수 (구문 파악 성공)',
+  },
+  {
+    id: 'soc-seed-02',
+    studentEmail: '20101_minjun@simin.hs.kr',
+    studentName: '20101 김민준',
+    passageTitle: '놀이와 일의 경계 및 기준 충족의 문제',
+    lesson: '실전 모의고사 3회',
+    itemNo: '30번 (p.131)',
+    timestamp: new Date(Date.now() - 1000 * 60 * 18).toLocaleString('ko-KR'),
+    studentQuestionSnippet: '아리스토텔레스가 지적한 "기준 충족에 대한 관심이 과도해질 때 놀이가 노동으로 변질된다"는 결론부가 인상 깊었습니다. 5번 moderate가 문맥상 과도한 집착을 뜻하는 excessive로 바뀌어야 정답이라는 것을 도출했습니다. 배움의 즐거움을 잃지 않는 학습 태도를 유지해야겠다고 느꼈습니다.',
+    aiHintLevel: 1,
+    keyTopic: '실전 3회 30번 놀이의 본질과 변질 원인 분석',
+    metacognitiveStatus: '우수 (구문 파악 성공)',
+  },
+  {
+    id: 'soc-seed-03',
+    studentEmail: '20102_seoyeon@simin.hs.kr',
+    studentName: '20102 이서연',
+    passageTitle: '리얼리즘 소설과 허구적 사실의 성격',
+    lesson: '실전 모의고사 3회',
+    itemNo: '29번 (p.131)',
+    timestamp: new Date(Date.now() - 1000 * 60 * 32).toLocaleString('ko-KR'),
+    studentQuestionSnippet: 'A번 대동사 문제에서 "Lies are designed to deceive, whereas Lord of the Flies is not"의 is가 대동사로 쓰인 원리를 이해했습니다. 일반동사 deceive의 대동사로 does를 쓸 뻔했으나 수동태 be designed를 받아야 한다는 것을 파악했습니다. 세특 탐구로 "문학 텍스트의 허구성 명제와 언어철학"을 연계하고 싶습니다.',
+    aiHintLevel: 1,
+    keyTopic: '실전 3회 29번 대동사 be/do 판별 및 허구명제 탐구',
+    metacognitiveStatus: '우수 (구문 파악 성공)',
+  },
+  {
+    id: 'soc-seed-04',
+    studentEmail: '20103_dohyun@simin.hs.kr',
+    studentName: '20103 박도현',
+    passageTitle: '놀이와 일의 경계 및 기준 충족의 문제',
+    lesson: '실전 모의고사 3회',
+    itemNo: '30번 (p.131)',
+    timestamp: new Date(Date.now() - 1000 * 60 * 50).toLocaleString('ko-KR'),
+    studentQuestionSnippet: 'Henry Curtis의 "놀이가 연습의 동기를 부여한다"는 주장을 읽고 야구 선수의 고된 연습이 놀이적 동기에서 비롯된다는 점에 공감했습니다. delayed reward(지연된 보상) 개념과 결부하여 심리학적 관점에서 지문을 분석해 보았습니다.',
+    aiHintLevel: 2,
+    keyTopic: '실전 3회 30번 지연된 보상과 내적 동기 분석',
+    metacognitiveStatus: '보통 (힌트 유도 필요)',
+  },
+  {
+    id: 'soc-seed-05',
+    studentEmail: '20104_jiwoo@simin.hs.kr',
+    studentName: '20104 최지우',
+    passageTitle: '리얼리즘 소설과 허구적 사실의 성격',
+    lesson: '실전 모의고사 3회',
+    itemNo: '29번 (p.131)',
+    timestamp: new Date(Date.now() - 1000 * 60 * 80).toLocaleString('ko-KR'),
+    studentQuestionSnippet: 'B번에서 claimed 뒤에 오는 목적어 절 접속사 that과 what의 구분 기준을 정리했습니다. 뒷문장이 완전한 2형식 문장(propositions in fiction are neither true nor false)이므로 접속사 that이 온다는 것을 명확히 설명할 수 있게 되었습니다.',
+    aiHintLevel: 1,
+    keyTopic: '실전 3회 29번 명사절 접속사 that vs what 구조 분석',
+    metacognitiveStatus: '우수 (구문 파악 성공)',
+  },
+  {
+    id: 'soc-seed-06',
+    studentEmail: '20105_yeeun@simin.hs.kr',
+    studentName: '20105 정예은',
+    passageTitle: '놀이와 일의 경계 및 기준 충족의 문제',
+    lesson: '실전 모의고사 3회',
+    itemNo: '30번 (p.131)',
+    timestamp: new Date(Date.now() - 1000 * 60 * 130).toLocaleString('ko-KR'),
+    studentQuestionSnippet: '단어 drudgery(고역, 고된 일)와 furnish an adequate motive의 뉘앙스를 확실히 학습했습니다. 어휘 문제에서 전체적인 논리 반전을 알리는 Aristotle, for example 뒷부분의 전환에 주목하여 5번 moderate의 문맥적 모순을 잡아냈습니다.',
+    aiHintLevel: 1,
+    keyTopic: '실전 3회 30번 핵심 어휘 습득 및 대조 논리 파악',
+    metacognitiveStatus: '우수 (구문 파악 성공)',
+  },
+  {
+    id: 'soc-seed-07',
+    studentEmail: '20101_minjun@simin.hs.kr',
+    studentName: '20101 김민준',
+    passageTitle: '리얼리즘 소설과 허구적 사실의 성격',
+    lesson: '실전 모의고사 3회',
+    itemNo: '29번 (p.131)',
+    timestamp: new Date(Date.now() - 1000 * 60 * 180).toLocaleString('ko-KR'),
+    studentQuestionSnippet: 'the fact that we call it fiction in the first place means that ... 구문에서 동격의 that절과 주어-동사 수일치(means)를 완벽히 정리했습니다. pull one\'s weight(자신의 역할을 다하다) 관용구를 문맥에 맞게 독해하는 훈련이 되었습니다.',
+    aiHintLevel: 1,
+    keyTopic: '실전 3회 29번 주어-동사 원거리 수일치 구문 정밀 분석',
+    metacognitiveStatus: '우수 (구문 파악 성공)',
+  },
+];
+
 /**
  * Deterministic Korean Date Parser that parses:
  * - "2026. 09. 14. 오후 06:35:12" / "2026. 9. 14. 오전 8:30"
@@ -336,7 +511,7 @@ export async function fetchServerAnalyticsData(): Promise<{
 
   // Merge Socratic logs (deduplicate by id)
   const socMap = new Map<string, SocraticSummary>();
-  [...firestoreSocratic, ...localSocratic, ...serverSocraticLogs].forEach((soc) => {
+  [...firestoreSocratic, ...localSocratic, ...serverSocraticLogs, ...INITIAL_SOCRATIC_SUMMARIES].forEach((soc) => {
     if (soc && soc.id) {
       socMap.set(soc.id, soc);
     }
@@ -390,6 +565,11 @@ const ALL_STUDENT_STORAGE_KEYS = [
  */
 export function getStoredStudentActivities(): StudentActivity[] {
   const map = new Map<string, StudentActivity>();
+
+  // 1. Preload initial seed students
+  INITIAL_STUDENTS.forEach((s) => {
+    map.set(s.email.toLowerCase().trim(), { ...s });
+  });
 
   ALL_STUDENT_STORAGE_KEYS.forEach((key) => {
     try {
@@ -551,6 +731,14 @@ export function getStoredSocraticSummaries(): SocraticSummary[] {
         });
       }
     } catch {}
+  });
+
+  // Always ensure seed socratic logs are available as fallback/initial records
+  INITIAL_SOCRATIC_SUMMARIES.forEach((seed) => {
+    const dedup = seed.id || `${seed.studentEmail.toLowerCase()}_${seed.studentQuestionSnippet.slice(0, 30)}`;
+    if (!socMap.has(dedup)) {
+      socMap.set(dedup, { ...seed });
+    }
   });
 
   return Array.from(socMap.values());
