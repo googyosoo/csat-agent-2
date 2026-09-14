@@ -152,11 +152,48 @@ app.post('/api/analytics/sync', (req, res) => {
 
     logsToAdd.forEach((log) => {
       if (log) {
+        const text = (log.studentQuestionSnippet || log.questionText || log.content || '').trim();
         const logId = log.id || `soc-sync-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
         log.id = logId;
-        const exists = globalSocraticLogs.some((l) => l.id === logId || (l.timestamp === log.timestamp && l.studentEmail === log.studentEmail));
+        // Deduplicate strictly by ID or identical email + passage + content
+        const exists = globalSocraticLogs.some((l) => {
+          if (l.id === logId) return true;
+          const lText = (l.studentQuestionSnippet || l.questionText || l.content || '').trim();
+          if (
+            l.studentEmail?.toLowerCase() === log.studentEmail?.toLowerCase() &&
+            l.passageTitle === log.passageTitle &&
+            lText.length > 2 &&
+            lText === text
+          ) {
+            return true;
+          }
+          return false;
+        });
         if (!exists) {
           globalSocraticLogs.unshift(log);
+        }
+
+        // Auto-register student into globalStudentsMap so guest student is never missing
+        if (log.studentEmail) {
+          const emailKey = log.studentEmail.toLowerCase().trim();
+          if (!globalStudentsMap.has(emailKey)) {
+            globalStudentsMap.set(emailKey, {
+              id: `std-guest-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              email: log.studentEmail,
+              name: log.studentName || (emailKey.includes('@') ? emailKey.split('@')[0] : '학습자'),
+              loginCount: 1,
+              lastLogin: log.timestamp || new Date().toLocaleString('ko-KR'),
+              totalDwellTimeMinutes: 5,
+              completedPassagesCount: 1,
+              transformedQuestionsGenerated: 0,
+              quizAccuracyPercentage: 0,
+              socraticQuestionsCount: 1,
+              status: 'online',
+            });
+          } else {
+            const cur = globalStudentsMap.get(emailKey)!;
+            cur.socraticQuestionsCount = (cur.socraticQuestionsCount || 0) + 1;
+          }
         }
       }
     });

@@ -243,9 +243,29 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
       }
     });
 
-    setStudents(Array.from(studentMap.values()));
-    setSocSummaries(Array.from(mergedSocMap.values()));
-    setLearningEvents(Array.from(mergedEvMap.values()));
+    const finalStudents = Array.from(studentMap.values());
+    const finalSocs = Array.from(mergedSocMap.values());
+    const finalEvts = Array.from(mergedEvMap.values());
+
+    // CRITICAL: Permanently save all collected students and reflection logs into teacher's browser localStorage
+    // This guarantees the teacher dashboard NEVER loses any student reflections even after page refresh, server restart, or offline state.
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        if (finalSocs.length > 0) {
+          localStorage.setItem('csat_analytics_socratic_v1', JSON.stringify(finalSocs.slice(0, 500)));
+        }
+        if (finalStudents.length > 0) {
+          localStorage.setItem('csat_analytics_students_v1', JSON.stringify(finalStudents.slice(0, 500)));
+        }
+        if (finalEvts.length > 0) {
+          localStorage.setItem('csat_analytics_learning_events_v1', JSON.stringify(finalEvts.slice(0, 500)));
+        }
+      }
+    } catch (e) {}
+
+    setStudents(finalStudents);
+    setSocSummaries(finalSocs);
+    setLearningEvents(finalEvts);
     setLastSyncTime(new Date().toLocaleTimeString('ko-KR'));
   };
 

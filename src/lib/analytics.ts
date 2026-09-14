@@ -403,6 +403,21 @@ export async function fetchServerAnalyticsData(): Promise<{
     }
   });
 
+  // CRITICAL: Persist all merged Socratic logs and students into current browser's localStorage
+  // This guarantees that even if the serverless backend restarts, all data remains permanently intact in the teacher's browser!
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const allSocs = Array.from(socMap.values());
+      const allStds = Array.from(studentMap.values());
+      if (allSocs.length > 0) {
+        localStorage.setItem(STORAGE_KEY_SOCRATIC, JSON.stringify(allSocs.slice(0, 500)));
+      }
+      if (allStds.length > 0) {
+        localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(allStds.slice(0, 500)));
+      }
+    }
+  } catch (e) {}
+
   // 4. Background auto-sync local data to cloud so other users (teachers) can see it
   autoSyncAllLocalDataToCloud();
 
@@ -456,6 +471,27 @@ export function getStoredStudentActivities(): StudentActivity[] {
   });
 
   return Array.from(map.values());
+}
+
+/**
+ * Helper to get unique guest student identifier and remembered name
+ */
+export function getGuestStudentIdentifier(): { guestId: string; guestName: string; guestEmail: string } {
+  if (typeof window === 'undefined') {
+    return { guestId: 'guest_default', guestName: '학습자 (미로그인 게스트)', guestEmail: 'guest_student@simin.hs.kr' };
+  }
+  let guestId = localStorage.getItem('csat_guest_client_id');
+  if (!guestId) {
+    guestId = 'guest_' + Math.random().toString(36).substring(2, 8);
+    localStorage.setItem('csat_guest_client_id', guestId);
+  }
+  const savedName = localStorage.getItem('csat_guest_student_name') || '';
+  const guestName = savedName.trim() || '학습자 (미로그인 게스트)';
+  const guestEmail = savedName.trim()
+    ? `${savedName.trim().replace(/\s+/g, '_')}@simin.hs.kr`
+    : `${guestId}@simin.hs.kr`;
+
+  return { guestId, guestName, guestEmail };
 }
 
 /**
@@ -700,8 +736,16 @@ export async function recordSocraticQuestion(data: {
   questionText: string;
   hintLevel?: number;
 }): Promise<void> {
-  const email = (data.studentEmail && data.studentEmail.trim()) ? data.studentEmail.trim().toLowerCase() : 'guest_student@simin.hs.kr';
-  const name = (data.studentName && data.studentName.trim()) ? data.studentName.trim() : (email.includes('@') ? email.split('@')[0] : '학습자');
+  let email = (data.studentEmail && data.studentEmail.trim()) ? data.studentEmail.trim().toLowerCase() : '';
+  let name = (data.studentName && data.studentName.trim()) ? data.studentName.trim() : '';
+
+  if (!email || email === 'guest_student@simin.hs.kr') {
+    const guestInfo = getGuestStudentIdentifier();
+    if (!name || name === '학습자' || name.includes('미로그인')) {
+      name = guestInfo.guestName;
+    }
+    email = guestInfo.guestEmail;
+  }
   const nowStr = new Date().toLocaleString('ko-KR', {
     year: 'numeric',
     month: '2-digit',

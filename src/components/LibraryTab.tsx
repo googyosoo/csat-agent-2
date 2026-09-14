@@ -20,7 +20,12 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 }) => {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [metacognitionInput, setMetacognitionInput] = useState('');
-  const [guestAuthorName, setGuestAuthorName] = useState('');
+  const [guestAuthorName, setGuestAuthorName] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('csat_guest_student_name') || '';
+    }
+    return '';
+  });
   const [isSavingSummary, setIsSavingSummary] = useState(false);
   const [summarySuccessMsg, setSummarySuccessMsg] = useState('');
 
@@ -351,14 +356,21 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               {!authUser ? (
                 <div className="flex-1">
-                  <label className="text-[11px] text-slate-400 font-bold block mb-1">
-                    학번 및 이름 <span className="text-purple-400">(미입력 시 '학습자 (미로그인 게스트)'로 등록)</span>
+                  <label className="text-[11px] text-slate-300 font-bold flex items-center space-x-1 mb-1">
+                    <i className="fa-solid fa-id-card text-purple-400"></i>
+                    <span>학번 및 이름</span>
+                    <span className="text-purple-400 font-normal">(로그인 없이도 입력한 이름으로 교사 대시보드에 영구 기록됩니다)</span>
                   </label>
                   <input
                     type="text"
                     value={guestAuthorName}
-                    onChange={(e) => setGuestAuthorName(e.target.value)}
-                    placeholder="예: 20106 강태윤"
+                    onChange={(e) => {
+                      setGuestAuthorName(e.target.value);
+                      if (typeof window !== 'undefined') {
+                        localStorage.setItem('csat_guest_student_name', e.target.value);
+                      }
+                    }}
+                    placeholder="예: 30105 김철수 (이름을 입력하면 교사 대시보드에 학생별로 영구 등록)"
                     className="w-full bg-slate-950 text-slate-100 text-xs rounded-xl px-3 py-2 border border-slate-800 focus:outline-none focus:border-purple-500 font-medium"
                   />
                 </div>
@@ -378,9 +390,10 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
               rows={4}
               className="w-full bg-slate-950 text-slate-100 text-xs rounded-xl p-3.5 border border-slate-800 focus:outline-none focus:border-purple-500 font-sans leading-relaxed resize-none"
             />
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-[11px] text-slate-500">
-                제출 시 교사 대시보드 [✍️ 학생별 지문 학습 소감 모아보기]에 실시간으로 등록됩니다.
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+              <span className="text-[11px] text-purple-300/90 font-medium flex items-center space-x-1">
+                <i className="fa-solid fa-cloud-arrow-up text-xs text-emerald-400"></i>
+                <span>🔒 미로그인 상태라도 작성한 소감은 교사 대시보드에 실시간 전송되어 영구 보존됩니다.</span>
               </span>
               <button
                 type="button"
@@ -390,6 +403,9 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                   setIsSavingSummary(true);
                   try {
                     const cleanGuest = guestAuthorName.trim();
+                    if (cleanGuest && typeof window !== 'undefined') {
+                      localStorage.setItem('csat_guest_student_name', cleanGuest);
+                    }
                     const studentName = authUser?.displayName || (cleanGuest || '학습자 (미로그인 게스트)');
                     const studentEmail = authUser?.email || (cleanGuest ? `${cleanGuest.replace(/\s+/g, '_')}@simin.hs.kr` : 'guest_student@simin.hs.kr');
 
@@ -403,7 +419,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                       hintLevel: 1,
                     });
 
-                    setSummarySuccessMsg(`🎉 [${studentName}] 님의 학습 소감이 교사 대시보드 및 마이 대시보드에 즉시 저장되었습니다!`);
+                    setSummarySuccessMsg(`🎉 [${studentName}] 님의 학습 소감이 교사 대시보드에 영구 저장되었습니다!`);
                     setMetacognitionInput('');
                   } catch (err: any) {
                     alert(`저장 중 오류가 발생했습니다: ${err?.message || err}`);
@@ -411,7 +427,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                     setIsSavingSummary(false);
                   }
                 }}
-                className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all disabled:opacity-40 flex items-center space-x-1.5"
+                className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg transition-all disabled:opacity-40 flex items-center space-x-1.5 shrink-0"
               >
                 {isSavingSummary ? (
                   <>
