@@ -134,15 +134,18 @@ app.post("/api/analytics/sync", (req, res) => {
               completedPassagesCount: 1,
               transformedQuestionsGenerated: 0,
               quizAccuracyPercentage: 0,
-              socraticQuestionsCount: 1,
+              socraticQuestionsCount: 0,
               status: "online"
             });
-          } else {
-            const cur = globalStudentsMap.get(emailKey);
-            cur.socraticQuestionsCount = (cur.socraticQuestionsCount || 0) + 1;
           }
         }
       }
+    });
+    globalStudentsMap.forEach((student2, emailKey) => {
+      const actualCount = globalSocraticLogs.filter(
+        (l) => l.studentEmail?.toLowerCase().trim() === emailKey
+      ).length;
+      student2.socraticQuestionsCount = actualCount;
     });
     const eventsToAdd = [];
     if (learningEvent) eventsToAdd.push(learningEvent);
@@ -206,6 +209,12 @@ app.get("/api/analytics/data", (req, res) => {
       if (e && e.id) evtMap.set(e.id, e);
     });
     globalLearningEvents = Array.from(evtMap.values());
+    globalStudentsMap.forEach((student, emailKey) => {
+      const actualCount = globalSocraticLogs.filter(
+        (l) => l.studentEmail?.toLowerCase().trim() === emailKey
+      ).length;
+      student.socraticQuestionsCount = actualCount;
+    });
     const students = Array.from(globalStudentsMap.values());
     return res.json({
       success: true,

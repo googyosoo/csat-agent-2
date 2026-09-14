@@ -105,7 +105,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [reportResult, setReportResult] = useState<StudentReportResult | null>(null);
   const [copied, setCopied] = useState(false);
-  // Google Sheets & CSV Export Modal State
+  // CSV & Data Export Modal State
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
 
@@ -130,7 +130,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         `"${s.totalDwellTimeMinutes || 0}"`,
         `"${s.completedPassagesCount || 0}"`,
         `"${s.transformedQuestionsGenerated || 0}"`,
-        `"${s.socraticQuestionsCount || 0}"`,
+        `"${studentSocraticLogs.length}"`,
         `"${mainTopics.replace(/"/g, '""')}"`
       ].join(',');
     });
@@ -152,7 +152,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
     triggerToast('📊 CSV 학습자 데이터 파일이 다운로드되었습니다 (Excel 한글 인코딩 지원).');
   };
 
-  const handleCopyForGoogleSheets = () => {
+  const handleCopyTSV = () => {
     const headers = ['학생이름', '이메일', '접속상태', '최근접속시각', '체류시간(분)', '완료지문수', '변형문제풀이수', '학습소감및탐구수', '주요탐구소재'];
     const rows = students.map(s => {
       const studentSocraticLogs = socSummaries.filter(
@@ -168,19 +168,14 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         s.totalDwellTimeMinutes || 0,
         s.completedPassagesCount || 0,
         s.transformedQuestionsGenerated || 0,
-        s.socraticQuestionsCount || 0,
+        studentSocraticLogs.length,
         mainTopics
       ].join('\t');
     });
 
     const tsvContent = [headers.join('\t'), ...rows].join('\n');
     navigator.clipboard.writeText(tsvContent);
-    triggerToast('📋 구글 시트용 데이터가 클립보드에 복사되었습니다! 열린 구글 시트에 Ctrl+V로 붙여넣으세요.');
-  };
-
-  const handleOpenGoogleSheetsNew = () => {
-    handleCopyForGoogleSheets();
-    window.open('https://sheets.new', '_blank');
+    triggerToast('📋 전체 학습자 데이터가 클립보드에 복사되었습니다! 엑셀 등에 Ctrl+V로 붙여넣으세요.');
   };
 
   // Load accumulated real data from Firestore DB and Server Store
@@ -263,6 +258,16 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
           });
         }
       }
+    });
+
+    // Reconcile and calculate accurate socraticQuestionsCount based on actual deduplicated reflections
+    studentMap.forEach((std, key) => {
+      const actualSocCount = Array.from(mergedSocMap.values()).filter((soc) => {
+        if (!soc || !soc.studentEmail) return false;
+        const sEmail = soc.studentEmail.toLowerCase().trim();
+        return sEmail === key || (sEmail.includes('@') && key.includes('@') && sEmail.split('@')[0] === key.split('@')[0]);
+      }).length;
+      std.socraticQuestionsCount = actualSocCount;
     });
 
     const finalStudents = Array.from(studentMap.values());
@@ -784,15 +789,6 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
           >
             <i className="fa-solid fa-rotate text-cyan-400"></i>
             <span>동기화</span>
-          </button>
-          {/* Google Sheets Sync Button */}
-          <button
-            onClick={handleOpenGoogleSheetsNew}
-            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all flex items-center space-x-2 shrink-0"
-            title="구글 시트(Google Sheets) 새 문서 생성 및 데이터 클립보드 즉시 연동"
-          >
-            <i className="fa-solid fa-table text-sm"></i>
-            <span>구글 시트 연동</span>
           </button>
 
           {/* CSV Export Button */}
@@ -1704,10 +1700,8 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                           {/* ✍️ 학생별 학습 소감 & 댓글 (강력 부각) */}
                           <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
                             {(() => {
-                              const reflectionCount = Math.max(
-                                std.socraticQuestionsCount || 0,
-                                effectiveRecords.filter((r) => r.sourceType === 'reflection').length
-                              );
+                              const studentReflections = effectiveRecords.filter((r) => r.sourceType === 'reflection');
+                              const reflectionCount = studentReflections.length;
                               if (reflectionCount > 0) {
                                 return (
                                   <button
@@ -2060,18 +2054,18 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         </div>
       )}
 
-      {/* Google Sheets & CSV Integration Modal */}
+      {/* Data Export Modal */}
       {showSyncModal && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 my-8">
+          <div className="bg-slate-900 border border-blue-500/40 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 my-8">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-lg font-bold">
-                  <i className="fa-solid fa-table"></i>
+                <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-lg font-bold">
+                  <i className="fa-solid fa-file-export"></i>
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-white">구글 시트 (Google Sheets) & CSV 연동 센터</h3>
-                  <p className="text-[11px] text-slate-400">학습자 실적 데이터를 스프레드시트에 즉시 동기화합니다.</p>
+                  <h3 className="text-sm font-bold text-white">학습자 데이터 내보내기 센터</h3>
+                  <p className="text-[11px] text-slate-400">학습자 실적 통계 데이터를 CSV 파일 또는 클립보드로 내보냅니다.</p>
                 </div>
               </div>
               <button
@@ -2083,38 +2077,12 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
             </div>
 
             <div className="space-y-4 text-xs">
-              {/* Option 1: Google Sheets Direct Sync */}
-              <div className="p-4 bg-slate-950 rounded-2xl border border-emerald-500/30 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-emerald-300 flex items-center space-x-1.5">
-                    <i className="fa-solid fa-cloud-arrow-up"></i>
-                    <span>방식 1. 구글 시트에 원클릭 연동 (추천)</span>
-                  </span>
-                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/30 font-bold">
-                    실시간 클립보드 Sync
-                  </span>
-                </div>
-                <p className="text-slate-400 text-[11px] leading-relaxed">
-                  버튼 클릭 시 구글 시트 새 문서(<span className="font-mono text-emerald-300">sheets.new</span>)가 열리며 전체 학습자 실적 데이터가 자동으로 클립보드에 복사됩니다. 열린 시트 A1 셀에서 <span className="font-mono font-bold text-white">Ctrl + V</span>를 누르시면 됩니다.
-                </p>
-                <button
-                  onClick={() => {
-                    handleOpenGoogleSheetsNew();
-                    setShowSyncModal(false);
-                  }}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow flex items-center justify-center space-x-2 text-xs"
-                >
-                  <i className="fa-solid fa-arrow-up-right-from-square"></i>
-                  <span>구글 시트 새 문서 열기 & 데이터 붙여넣기</span>
-                </button>
-              </div>
-
-              {/* Option 2: CSV File Download */}
-              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-2.5">
+              {/* Option 1: CSV File Download */}
+              <div className="p-4 bg-slate-950 rounded-2xl border border-blue-500/30 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-blue-300 flex items-center space-x-1.5">
                     <i className="fa-solid fa-file-csv"></i>
-                    <span>방식 2. Excel CSV 파일 내보내기</span>
+                    <span>Excel CSV 파일 내보내기</span>
                   </span>
                   <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded border border-blue-500/30 font-bold">
                     UTF-8 BOM 인코딩
@@ -2135,11 +2103,11 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                 </button>
               </div>
 
-              {/* Option 3: Copy to Clipboard */}
+              {/* Option 2: Copy to Clipboard */}
               <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 flex items-center justify-between">
                 <span className="text-[11px] text-slate-400">클립보드에 TSV 형식으로 직접 복사:</span>
                 <button
-                  onClick={handleCopyForGoogleSheets}
+                  onClick={handleCopyTSV}
                   className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold rounded-lg border border-slate-700 transition-all flex items-center space-x-1"
                 >
                   <i className="fa-solid fa-copy"></i>
@@ -2248,7 +2216,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                 </div>
                 <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
                   <span className="text-slate-400">성찰 소감</span>
-                  <span className="font-bold text-rose-400 font-mono">{selectedStudentForRecords.socraticQuestionsCount}건</span>
+                  <span className="font-bold text-rose-400 font-mono">{reflectionCount}건</span>
                 </div>
               </div>
 

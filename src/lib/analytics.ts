@@ -403,6 +403,16 @@ export async function fetchServerAnalyticsData(): Promise<{
     }
   });
 
+  // CRITICAL: Reconcile socraticQuestionsCount so stale/inflated runaway counters are sanitized
+  studentMap.forEach((std, key) => {
+    const actualSocCount = Array.from(socMap.values()).filter((soc) => {
+      if (!soc || !soc.studentEmail) return false;
+      const socKey = soc.studentEmail.toLowerCase().trim();
+      return socKey === key || (socKey.includes('@') && key.includes('@') && socKey.split('@')[0] === key.split('@')[0]);
+    }).length;
+    std.socraticQuestionsCount = actualSocCount;
+  });
+
   // CRITICAL: Persist all merged Socratic logs and students into current browser's localStorage
   // This guarantees that even if the serverless backend restarts, all data remains permanently intact in the teacher's browser!
   try {
