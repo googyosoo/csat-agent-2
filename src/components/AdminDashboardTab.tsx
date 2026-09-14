@@ -761,16 +761,19 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
           <button
             onClick={() => setActiveMainTab('reflections')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 ${
+            className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center space-x-2.5 shadow-md ${
               activeMainTab === 'reflections'
-                ? 'bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-md shadow-rose-950/50'
-                : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                ? 'bg-gradient-to-r from-rose-600 via-pink-600 to-rose-500 text-white shadow-rose-950/60 ring-2 ring-rose-400/50 scale-[1.03]'
+                : 'bg-rose-950/30 text-rose-300 hover:text-white hover:bg-rose-900/40 border border-rose-500/40'
             }`}
           >
-            <i className="fa-solid fa-comments text-rose-300"></i>
+            <i className="fa-solid fa-comments text-rose-300 text-sm"></i>
             <span>✍️ 학생별 학습 소감(댓글) 모아보기</span>
-            <span className="px-1.5 py-0.2 bg-rose-500/20 text-rose-300 rounded text-[10px] font-mono font-bold">
+            <span className="px-2 py-0.5 bg-rose-500/30 text-rose-200 border border-rose-400/40 rounded-full text-[10px] font-mono font-bold">
               {allReflectionsOnly.length}건
+            </span>
+            <span className="px-1.5 py-0.2 bg-amber-400 text-slate-950 rounded text-[9px] font-extrabold uppercase">
+              핵심
             </span>
           </button>
 
@@ -797,9 +800,9 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         </div>
       </div>
 
-      {/* KPI Top Cards Grid */}
+      {/* KPI Top Cards Grid (4 Columns, Login Count Removed) */}
       {activeMainTab !== 'feed' && (
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg flex flex-col justify-between">
             <div className="flex items-center justify-between text-slate-400">
               <span className="text-xs font-bold">누적 수강 학생 수</span>
@@ -808,17 +811,6 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
             <div className="mt-2 flex items-baseline space-x-2">
               <span className="text-2xl font-extrabold text-white font-mono">{metrics.totalStudents}</span>
               <span className="text-xs text-purple-400 font-semibold">명</span>
-            </div>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg flex flex-col justify-between">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-bold">총 로그인 횟수</span>
-              <i className="fa-solid fa-key text-cyan-400 text-sm"></i>
-            </div>
-            <div className="mt-2 flex items-baseline space-x-2">
-              <span className="text-2xl font-extrabold text-white font-mono">{metrics.totalLogins}</span>
-              <span className="text-xs text-cyan-400 font-semibold">회</span>
             </div>
           </div>
 
@@ -835,23 +827,38 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg flex flex-col justify-between">
             <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-bold">변형문제 풀이</span>
+              <span className="text-xs font-bold">변형문제 풀이 실적</span>
               <i className="fa-solid fa-file-pen text-emerald-400 text-sm"></i>
             </div>
             <div className="mt-2 flex items-baseline space-x-2">
               <span className="text-2xl font-extrabold text-white font-mono">{metrics.totalGeneratedQuestions}</span>
               <span className="text-xs text-emerald-400 font-semibold">건</span>
+              {allUnifiedRecords.filter((r) => r.sourceType === 'quiz').length > 0 && (
+                <span className="text-[11px] text-emerald-300/80 font-mono ml-auto">
+                  (정답률 {Math.round(
+                    (allUnifiedRecords.filter((r) => r.sourceType === 'quiz' && r.isCorrect === true).length /
+                      Math.max(allUnifiedRecords.filter((r) => r.sourceType === 'quiz').length, 1)) *
+                      100
+                  )}%)
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg flex flex-col justify-between col-span-2 lg:col-span-1">
-            <div className="flex items-center justify-between text-slate-400">
-              <span className="text-xs font-bold">학습 소감/탐구</span>
-              <i className="fa-solid fa-comments text-purple-400 text-sm"></i>
+          <div className="bg-gradient-to-br from-rose-950/40 via-slate-900 to-slate-900 border-2 border-rose-500/50 p-4 rounded-2xl shadow-xl shadow-rose-950/20 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-rose-300">
+              <span className="text-xs font-bold flex items-center space-x-1.5">
+                <i className="fa-solid fa-star text-amber-400 text-xs animate-pulse"></i>
+                <span>✍️ 학생별 학습 소감/댓글</span>
+              </span>
+              <i className="fa-solid fa-comments text-rose-400 text-sm"></i>
             </div>
             <div className="mt-2 flex items-baseline space-x-2">
-              <span className="text-2xl font-extrabold text-white font-mono">{metrics.totalSocraticConversations}</span>
-              <span className="text-xs text-purple-400 font-semibold">건</span>
+              <span className="text-2xl font-black text-rose-300 font-mono">{allReflectionsOnly.length}</span>
+              <span className="text-xs text-rose-400 font-semibold">건 작성됨</span>
+              <span className="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-bold ml-auto">
+                핵심 집중
+              </span>
             </div>
           </div>
         </div>
@@ -859,20 +866,24 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
       {/* ✍️ Dedicated Student Reflections (학습 소감 / 댓글) 모아보기 Section (Top Primary Section) */}
       {(activeMainTab === 'all' || activeMainTab === 'reflections' || activeMainTab === 'students') && (
-        <div id="student-reflections-section" className="bg-slate-900 border border-rose-500/30 rounded-3xl p-6 shadow-2xl space-y-5">
+        <div id="student-reflections-section" className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-2 border-rose-500/40 rounded-3xl p-6 shadow-2xl shadow-rose-950/20 space-y-5">
           {/* Section Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
             <div className="flex items-center space-x-3">
-              <div className="w-11 h-11 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center text-xl font-bold shadow-inner">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-600 to-pink-600 text-white flex items-center justify-center text-xl font-bold shadow-lg shadow-rose-950/40">
                 <i className="fa-solid fa-comments"></i>
               </div>
               <div>
-                <div className="flex items-center space-x-2">
-                  <h3 className="text-base font-bold text-white tracking-tight">
-                    ✍️ 학생별 지문 학습 소감(댓글) 모아보기
+                <div className="flex items-center space-x-2.5">
+                  <h3 className="text-lg font-black text-white tracking-tight flex items-center space-x-2">
+                    <span>✍️ 학생별 지문 학습 소감(댓글) 모아보기</span>
                   </h3>
-                  <span className="px-2.5 py-0.5 bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-lg font-mono">
+                  <span className="px-2.5 py-0.5 bg-rose-500/20 text-rose-300 border border-rose-500/40 text-xs font-bold rounded-lg font-mono">
                     총 {allReflectionsOnly.length}건
+                  </span>
+                  <span className="px-2 py-0.5 bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-extrabold rounded-md flex items-center space-x-1">
+                    <i className="fa-solid fa-crown text-[9px]"></i>
+                    <span>교사 집중 모니터링</span>
                   </span>
                   {activeMainTab === 'reflections' && (
                     <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold rounded-md">
@@ -1215,8 +1226,8 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                     <th className="py-2.5 px-3">최근 접속</th>
                     <th className="py-2.5 px-3">체류 시간</th>
                     <th className="py-2.5 px-3">완료 지문</th>
-                    <th className="py-2.5 px-3">변형 문제</th>
-                    <th className="py-2.5 px-3">학습 소감</th>
+                    <th className="py-2.5 px-3 text-cyan-300">변형 문제 & 정오답</th>
+                    <th className="py-2.5 px-3 text-rose-300 font-bold">✍️ 학습 소감 & 댓글</th>
                     <th className="py-2.5 px-3 text-right">기록 상세 & AI 세특</th>
                   </tr>
                 </thead>
@@ -1241,6 +1252,12 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                         });
 
                     const recentLogs = effectiveRecords.slice(0, 6);
+
+                    // Quiz stats for simple correct/incorrect indicator
+                    const quizLogs = effectiveRecords.filter((r) => r.sourceType === 'quiz');
+                    const correctCount = quizLogs.filter((r) => r.isCorrect === true).length;
+                    const incorrectCount = quizLogs.filter((r) => r.isCorrect === false).length;
+                    const totalQuizCount = Math.max(std.transformedQuestionsGenerated || 0, quizLogs.length);
 
                     return (
                       <React.Fragment key={std.id}>
@@ -1291,7 +1308,34 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                             <span className="font-bold text-amber-300 font-mono">{std.totalDwellTimeMinutes}</span> 분
                           </td>
                           <td className="py-3 px-3 font-bold text-purple-300 font-mono">{std.completedPassagesCount} 지문</td>
-                          <td className="py-3 px-3 font-bold text-cyan-300 font-mono">{std.transformedQuestionsGenerated} 문제</td>
+                          {/* 변형 문제 & 정오답 표시 컬럼 */}
+                          <td className="py-3 px-3">
+                            {totalQuizCount === 0 ? (
+                              <span className="text-slate-500 font-mono text-xs">미응시</span>
+                            ) : (
+                              <div className="space-y-1">
+                                <div className="font-bold text-cyan-300 font-mono text-xs">
+                                  {totalQuizCount}문제 풀이
+                                </div>
+                                {quizLogs.length > 0 ? (
+                                  <div className="flex items-center space-x-1.5 text-[10px]">
+                                    <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded font-bold font-mono" title="정답 개수">
+                                      ✓ {correctCount}
+                                    </span>
+                                    <span className="px-1.5 py-0.2 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded font-bold font-mono" title="오답 개수">
+                                      ✗ {incorrectCount}
+                                    </span>
+                                    <span className="text-slate-400 font-mono text-[10px]">
+                                      ({Math.round((correctCount / quizLogs.length) * 100)}%)
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-[10px] text-slate-500">기록 집계 중</span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          {/* ✍️ 학생별 학습 소감 & 댓글 (강력 부각) */}
                           <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
                             {(() => {
                               const reflectionCount = Math.max(
@@ -1314,15 +1358,19 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                                         document.getElementById('student-reflections-section')?.scrollIntoView({ behavior: 'smooth' });
                                       }, 100);
                                     }}
-                                    className="px-2.5 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 hover:text-rose-200 border border-rose-500/30 hover:border-rose-400 rounded-lg text-xs font-bold font-mono transition-all flex items-center space-x-1.5 shadow-sm cursor-pointer"
-                                    title={`${std.name} 학생의 소감/댓글 모아보기 (클릭 시 소감 모아보기 이동 및 행 펼침)`}
+                                    className="px-3.5 py-1.5 bg-gradient-to-r from-rose-600 via-pink-600 to-rose-500 hover:from-rose-500 hover:to-pink-500 text-white border border-rose-400/50 rounded-xl text-xs font-black font-mono transition-all flex items-center space-x-2 shadow-lg shadow-rose-950/60 hover:scale-105 active:scale-95 cursor-pointer ring-2 ring-rose-400/30"
+                                    title={`${std.name} 학생의 소감 및 댓글 확인 (클릭 시 소감 모아보기 이동 및 행 펼침)`}
                                   >
-                                    <i className="fa-solid fa-comment-dots text-[11px] text-rose-400"></i>
-                                    <span>{reflectionCount}건 보기</span>
+                                    <span className="relative flex h-2 w-2">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-300 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-100"></span>
+                                    </span>
+                                    <i className="fa-solid fa-comments text-xs text-rose-100"></i>
+                                    <span>소감 {reflectionCount}건 보기</span>
                                   </button>
                                 );
                               }
-                              return <span className="text-slate-500 font-mono text-xs">0건</span>;
+                              return <span className="text-slate-500 font-mono text-xs pl-2">0건</span>;
                             })()}
                           </td>
                           <td className="py-3 px-3 text-right" onClick={(e) => e.stopPropagation()}>
@@ -1357,10 +1405,20 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                                 <div className="flex items-center space-x-2">
                                   <i className="fa-solid fa-folder-open text-purple-400 text-xs"></i>
                                   <span className="font-bold text-slate-200 text-xs">
-                                    [{std.name}] 학생이 작성한 실시간 학습 기록 미리보기
+                                    [{std.name}] 학생 실시간 학습 기록
                                   </span>
+                                  {quizLogs.length > 0 && (
+                                    <span className="flex items-center space-x-1 text-[10px]">
+                                      <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded font-bold font-mono">
+                                        ✓ 정답 {correctCount}
+                                      </span>
+                                      <span className="px-1.5 py-0.2 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded font-bold font-mono">
+                                        ✗ 오답 {incorrectCount}
+                                      </span>
+                                    </span>
+                                  )}
                                   <span className="text-[11px] text-slate-400 font-mono">
-                                    (총 {effectiveRecords.length}건 중 최근 {recentLogs.length}건)
+                                    (총 {effectiveRecords.length}건)
                                   </span>
                                 </div>
                                 <button
