@@ -174,23 +174,76 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
     const { students: sList, socraticLogs: socList, learningEvents: evList } = await fetchServerAnalyticsData();
 
     // 3. Guarantee that locally stored summaries in this browser are also merged
+    const localStudents = getStoredStudentActivities();
     const localSocs = getStoredSocraticSummaries();
     const localEvts = getStoredLearningEvents();
 
     const mergedSocMap = new Map<string, SocraticSummary>();
     [...socList, ...localSocs].forEach((s) => {
       if (s) {
-        const key = s.id || `${s.passageTitle}_${(s.studentQuestionSnippet || '').slice(0, 30)}`;
+        const key = s.id || `${s.studentEmail || 'guest'}_${s.passageTitle || ''}_${(s.studentQuestionSnippet || '').slice(0, 30)}`;
+        if (!s.id) s.id = key;
         mergedSocMap.set(key, s);
       }
     });
 
     const mergedEvMap = new Map<string, LearningEvent>();
     [...evList, ...localEvts].forEach((e) => {
-      if (e && e.id) mergedEvMap.set(e.id, e);
+      if (e) {
+        const key = e.id || `${e.studentEmail || 'guest'}_${e.passageTitle || ''}_${(e.reasonText || '').slice(0, 30)}`;
+        if (!e.id) e.id = key;
+        mergedEvMap.set(key, e);
+      }
     });
 
-    setStudents(sList);
+    // Merge students from server and local storage
+    const studentMap = new Map<string, StudentActivity>();
+    [...localStudents, ...sList].forEach((std) => {
+      if (std && std.email) {
+        const key = std.email.toLowerCase().trim();
+        const existing = studentMap.get(key);
+        if (!existing) {
+          studentMap.set(key, std);
+        } else {
+          studentMap.set(key, {
+            ...existing,
+            ...std,
+            loginCount: Math.max(existing.loginCount || 1, std.loginCount || 1),
+            totalDwellTimeMinutes: Math.max(existing.totalDwellTimeMinutes || 0, std.totalDwellTimeMinutes || 0),
+            completedPassagesCount: Math.max(existing.completedPassagesCount || 0, std.completedPassagesCount || 0),
+            transformedQuestionsGenerated: Math.max(existing.transformedQuestionsGenerated || 0, std.transformedQuestionsGenerated || 0),
+            socraticQuestionsCount: Math.max(existing.socraticQuestionsCount || 0, std.socraticQuestionsCount || 0),
+          });
+        }
+      }
+    });
+
+    // Also ensure any author of reflections exists in students list
+    Array.from(mergedSocMap.values()).forEach((soc) => {
+      if (soc && soc.studentEmail) {
+        const key = soc.studentEmail.toLowerCase().trim();
+        const existing = studentMap.get(key);
+        if (!existing) {
+          const name = soc.studentName || (key.includes('@') ? key.split('@')[0] : '학습자');
+          studentMap.set(key, {
+            id: `std-soc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            email: soc.studentEmail,
+            name,
+            loginCount: 1,
+            lastLogin: soc.timestamp || new Date().toLocaleString('ko-KR'),
+            totalDwellTimeMinutes: 5,
+            completedPassagesCount: 1,
+            transformedQuestionsGenerated: 0,
+            quizAccuracyPercentage: 0,
+            socraticQuestionsCount: 1,
+            status: 'offline',
+            socraticLogs: [soc],
+          });
+        }
+      }
+    });
+
+    setStudents(Array.from(studentMap.values()));
     setSocSummaries(Array.from(mergedSocMap.values()));
     setLearningEvents(Array.from(mergedEvMap.values()));
     setLastSyncTime(new Date().toLocaleTimeString('ko-KR'));
@@ -429,9 +482,14 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
     return records.sort((a, b) => b.rawTimestamp - a.rawTimestamp);
   }, [learningEvents, socSummaries, students]);
 
-  // All reflection logs only (학습 소감 / 학생 댓글)
+  // All reflection logs and study comments (학습 소감 / 학생 사고기록 / 댓글 전수 포함)
   const allReflectionsOnly = React.useMemo(() => {
-    return allUnifiedRecords.filter((r) => r.sourceType === 'reflection');
+    return allUnifiedRecords.filter((r) => {
+      if (r.sourceType === 'reflection') return true;
+      // Also include any record with written student thought/reason
+      if (r.content && r.content.trim().length > 3 && !r.content.includes('정답을 올바르게 도출함')) return true;
+      return false;
+    });
   }, [allUnifiedRecords]);
 
   // Unique students who have written reflections (plus all registered students)
@@ -456,7 +514,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
       } else {
         studentMap.set(key, {
           email,
-          name: r.studentName || '학습자',
+          name: r.studentName || (email.includes('@') ? email.split('@')[0] : '학습자'),
           reflectionCount: 1,
         });
       }
@@ -469,10 +527,22 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   const filteredStudentReflections = React.useMemo(() => {
     let list = allReflectionsOnly;
 
-    // 1. 학생별 필터링
+    // 1. 학생별 필터링 (스마트 매칭: 이메일 또는 이름/게스트 유연 매치)
     if (reflectionStudentFilter !== 'all') {
       const filterKey = reflectionStudentFilter.toLowerCase().trim();
-      list = list.filter((r) => (r.studentEmail || '').toLowerCase().trim() === filterKey);
+      const matchedStudent = students.find(
+        (s) => s.email.toLowerCase().trim() === filterKey || (s.id && s.id === filterKey)
+      );
+      const studentName = (matchedStudent?.name || (filterKey.includes('@') ? '' : filterKey)).toLowerCase().trim();
+
+      list = list.filter((r) => {
+        const rEmail = (r.studentEmail || '').toLowerCase().trim();
+        const rName = (r.studentName || '').toLowerCase().trim();
+        if (rEmail === filterKey) return true;
+        if (filterKey.includes('@') && rEmail.includes('@') && filterKey.split('@')[0] === rEmail.split('@')[0]) return true;
+        if (studentName && rName && (rName === studentName || rName.includes(studentName) || studentName.includes(rName))) return true;
+        return false;
+      });
     }
 
     // 2. 검색어 필터링
@@ -506,9 +576,26 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
     );
   };
 
-  // Helper to get records for a specific student (already sorted in DESC order)
-  const getRecordsForStudent = (email: string) => {
-    return allUnifiedRecords.filter((r) => r.studentEmail.toLowerCase() === email.toLowerCase());
+  // Smart Helper to get records for a specific student (matches email, prefix, or name)
+  const getRecordsForStudent = (student: StudentActivity | string) => {
+    const email = typeof student === 'string' ? student.toLowerCase().trim() : (student.email || '').toLowerCase().trim();
+    const name = typeof student === 'string' ? '' : (student.name || '').trim();
+
+    return allUnifiedRecords.filter((r) => {
+      const rEmail = (r.studentEmail || '').toLowerCase().trim();
+      const rName = (r.studentName || '').trim();
+
+      // 1. Email exact match
+      if (rEmail === email) return true;
+      // 2. Email prefix match
+      if (email.includes('@') && rEmail.includes('@') && email.split('@')[0] === rEmail.split('@')[0]) return true;
+      // 3. Name match
+      if (name && rName && (name === rName || name.includes(rName) || rName.includes(name))) return true;
+      // 4. If single student or guest fallback
+      if (students.length === 1 && (rEmail === 'guest_student@simin.hs.kr' || !rEmail)) return true;
+
+      return false;
+    });
   };
 
   // Filtered latest activity stream records
@@ -771,7 +858,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
       )}
 
       {/* ✍️ Dedicated Student Reflections (학습 소감 / 댓글) 모아보기 Section (Top Primary Section) */}
-      {(activeMainTab === 'all' || activeMainTab === 'reflections') && (
+      {(activeMainTab === 'all' || activeMainTab === 'reflections' || activeMainTab === 'students') && (
         <div id="student-reflections-section" className="bg-slate-900 border border-rose-500/30 rounded-3xl p-6 shadow-2xl space-y-5">
           {/* Section Header */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
@@ -1135,9 +1222,25 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-xs">
                   {filteredStudents.map((std) => {
-                    const studentRecords = getRecordsForStudent(std.email);
+                    const studentRecords = getRecordsForStudent(std);
                     const isExpanded = expandedStudentIds.includes(std.id);
-                    const recentLogs = studentRecords.slice(0, 3);
+                    
+                    // Fallback to allReflectionsOnly if studentRecords is empty but reflections exist
+                    const effectiveRecords = studentRecords.length > 0
+                      ? studentRecords
+                      : allReflectionsOnly.filter((r) => {
+                          const rEmail = (r.studentEmail || '').toLowerCase().trim();
+                          const rName = (r.studentName || '').toLowerCase().trim();
+                          const sEmail = (std.email || '').toLowerCase().trim();
+                          const sName = (std.name || '').toLowerCase().trim();
+                          if (rEmail === sEmail) return true;
+                          if (sEmail.includes('@') && rEmail.includes('@') && sEmail.split('@')[0] === rEmail.split('@')[0]) return true;
+                          if (sName && rName && (sName === rName || sName.includes(rName) || rName.includes(sName))) return true;
+                          if (filteredStudents.length === 1) return true;
+                          return false;
+                        });
+
+                    const recentLogs = effectiveRecords.slice(0, 6);
 
                     return (
                       <React.Fragment key={std.id}>
@@ -1174,9 +1277,9 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                             <div>
                               <div className="font-bold text-slate-200 flex items-center space-x-1.5">
                                 <span>{std.name}</span>
-                                {studentRecords.length > 0 && (
+                                {effectiveRecords.length > 0 && (
                                   <span className="px-1.5 py-0.2 bg-purple-500/20 text-purple-300 text-[10px] rounded border border-purple-500/30 font-mono font-bold">
-                                    기록 {studentRecords.length}건
+                                    기록 {effectiveRecords.length}건
                                   </span>
                                 )}
                               </div>
@@ -1193,17 +1296,26 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                             {(() => {
                               const reflectionCount = Math.max(
                                 std.socraticQuestionsCount || 0,
-                                studentRecords.filter((r) => r.sourceType === 'reflection').length
+                                effectiveRecords.filter((r) => r.sourceType === 'reflection').length
                               );
                               if (reflectionCount > 0) {
                                 return (
                                   <button
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      // 1) 즉시 아코디언 행 열기
+                                      if (!expandedStudentIds.includes(std.id)) {
+                                        setExpandedStudentIds((prev) => [...prev, std.id]);
+                                      }
+                                      // 2) 소감 모아보기 필터 설정
                                       setReflectionStudentFilter(std.email);
-                                      setActiveMainTab('reflections');
+                                      // 3) 상단 소감 모아보기 섹션으로 부드럽게 스크롤
+                                      setTimeout(() => {
+                                        document.getElementById('student-reflections-section')?.scrollIntoView({ behavior: 'smooth' });
+                                      }, 100);
                                     }}
-                                    className="px-2.5 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 hover:text-rose-200 border border-rose-500/30 hover:border-rose-400 rounded-lg text-xs font-bold font-mono transition-all flex items-center space-x-1.5 shadow-sm"
-                                    title={`${std.name} 학생의 소감/댓글 모아보기 (클릭 시 소감 탭으로 이동)`}
+                                    className="px-2.5 py-1 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 hover:text-rose-200 border border-rose-500/30 hover:border-rose-400 rounded-lg text-xs font-bold font-mono transition-all flex items-center space-x-1.5 shadow-sm cursor-pointer"
+                                    title={`${std.name} 학생의 소감/댓글 모아보기 (클릭 시 소감 모아보기 이동 및 행 펼침)`}
                                   >
                                     <i className="fa-solid fa-comment-dots text-[11px] text-rose-400"></i>
                                     <span>{reflectionCount}건 보기</span>
@@ -1222,7 +1334,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                                 title="이 학생이 작성한 모든 학습 소감 및 문제 풀이 기록 확인"
                               >
                                 <i className="fa-solid fa-book-open"></i>
-                                <span>기록 보기 ({studentRecords.length})</span>
+                                <span>기록 보기 ({effectiveRecords.length})</span>
                               </button>
 
                               {/* AI Setek Generator Button */}
@@ -1248,19 +1360,19 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                                     [{std.name}] 학생이 작성한 실시간 학습 기록 미리보기
                                   </span>
                                   <span className="text-[11px] text-slate-400 font-mono">
-                                    (총 {studentRecords.length}건 중 최근 {recentLogs.length}건)
+                                    (총 {effectiveRecords.length}건 중 최근 {recentLogs.length}건)
                                   </span>
                                 </div>
                                 <button
                                   onClick={() => setSelectedStudentForRecords(std)}
-                                  className="text-xs text-cyan-400 hover:text-cyan-300 font-bold flex items-center space-x-1 underline decoration-cyan-500/40"
+                                  className="text-xs text-cyan-400 hover:text-cyan-300 font-bold flex items-center space-x-1 underline decoration-cyan-500/40 cursor-pointer"
                                 >
-                                  <span>전체 기록 {studentRecords.length}건 팝업으로 상세 보기</span>
+                                  <span>전체 기록 {effectiveRecords.length}건 팝업으로 상세 보기</span>
                                   <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                                 </button>
                               </div>
 
-                              {studentRecords.length === 0 ? (
+                              {effectiveRecords.length === 0 ? (
                                 <p className="text-xs text-slate-500 py-3 text-center bg-slate-900/50 rounded-xl border border-slate-800/60">
                                   아직 작성한 학습 소감이나 문제 풀이 기록이 없습니다.
                                 </p>
@@ -1550,7 +1662,20 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
       )}
       {/* Student Records Detail Modal (학생별 작성 기록 상세 모달) */}
       {selectedStudentForRecords && (() => {
-        const studentAllLogs = getRecordsForStudent(selectedStudentForRecords.email);
+        const studentRawLogs = getRecordsForStudent(selectedStudentForRecords);
+        const studentAllLogs = studentRawLogs.length > 0
+          ? studentRawLogs
+          : allReflectionsOnly.filter((r) => {
+              const rEmail = (r.studentEmail || '').toLowerCase().trim();
+              const rName = (r.studentName || '').toLowerCase().trim();
+              const sEmail = (selectedStudentForRecords.email || '').toLowerCase().trim();
+              const sName = (selectedStudentForRecords.name || '').toLowerCase().trim();
+              if (rEmail === sEmail) return true;
+              if (sEmail.includes('@') && rEmail.includes('@') && sEmail.split('@')[0] === rEmail.split('@')[0]) return true;
+              if (sName && rName && (sName === rName || sName.includes(rName) || rName.includes(sName))) return true;
+              return false;
+            });
+
         const filteredLogs = studentAllLogs.filter((rec) => {
           if (studentRecordsFilter === 'reflection' && rec.sourceType !== 'reflection') return false;
           if (studentRecordsFilter === 'quiz' && rec.sourceType !== 'quiz') return false;

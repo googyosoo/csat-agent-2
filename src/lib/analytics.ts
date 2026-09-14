@@ -334,19 +334,23 @@ export async function fetchServerAnalyticsData(): Promise<{
   firestoreStudents.forEach(addOrUpdateStudent);
   serverStudents.forEach(addOrUpdateStudent);
 
-  // Merge Socratic logs (deduplicate by id)
+  // Merge Socratic logs (deduplicate by id or unique signature)
   const socMap = new Map<string, SocraticSummary>();
   [...firestoreSocratic, ...localSocratic, ...serverSocraticLogs].forEach((soc) => {
-    if (soc && soc.id) {
-      socMap.set(soc.id, soc);
+    if (soc) {
+      const key = soc.id || `${soc.studentEmail || 'guest'}_${soc.passageTitle || ''}_${(soc.studentQuestionSnippet || '').slice(0, 30)}`;
+      if (!soc.id) soc.id = key;
+      socMap.set(key, soc);
     }
   });
 
-  // Merge Learning Events (deduplicate by id)
+  // Merge Learning Events (deduplicate by id or signature)
   const eventMap = new Map<string, LearningEvent>();
   [...firestoreEvents, ...localEvents, ...serverLearningEvents].forEach((ev) => {
-    if (ev && ev.id) {
-      eventMap.set(ev.id, ev);
+    if (ev) {
+      const key = ev.id || `${ev.studentEmail || 'guest'}_${ev.passageTitle || ''}_${(ev.reasonText || '').slice(0, 30)}`;
+      if (!ev.id) ev.id = key;
+      eventMap.set(key, ev);
     }
   });
 
@@ -354,17 +358,48 @@ export async function fetchServerAnalyticsData(): Promise<{
   Array.from(studentMap.values()).forEach((std) => {
     if (std.socraticLogs && Array.isArray(std.socraticLogs)) {
       std.socraticLogs.forEach((soc) => {
-        if (soc && soc.id) {
-          socMap.set(soc.id, soc);
+        if (soc) {
+          const key = soc.id || `${soc.studentEmail || std.email}_${soc.passageTitle || ''}_${(soc.studentQuestionSnippet || '').slice(0, 30)}`;
+          if (!soc.id) soc.id = key;
+          socMap.set(key, soc);
         }
       });
     }
     if (std.learningEvents && Array.isArray(std.learningEvents)) {
       std.learningEvents.forEach((ev) => {
-        if (ev && ev.id) {
-          eventMap.set(ev.id, ev);
+        if (ev) {
+          const key = ev.id || `${ev.studentEmail || std.email}_${ev.passageTitle || ''}_${(ev.reasonText || '').slice(0, 30)}`;
+          if (!ev.id) ev.id = key;
+          eventMap.set(key, ev);
         }
       });
+    }
+  });
+
+  // CRITICAL: Auto-register any student who wrote a reflection/log into studentMap so they are visible in teacher dashboard
+  Array.from(socMap.values()).forEach((soc) => {
+    if (soc && soc.studentEmail) {
+      const key = soc.studentEmail.toLowerCase().trim();
+      const existing = studentMap.get(key);
+      if (!existing) {
+        const name = soc.studentName || (key.includes('@') ? key.split('@')[0] : '학습자');
+        studentMap.set(key, {
+          id: `std-from-soc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          email: soc.studentEmail,
+          name,
+          loginCount: 1,
+          lastLogin: soc.timestamp || new Date().toLocaleString('ko-KR'),
+          totalDwellTimeMinutes: 5,
+          completedPassagesCount: 1,
+          transformedQuestionsGenerated: 0,
+          quizAccuracyPercentage: 0,
+          socraticQuestionsCount: 1,
+          status: 'offline',
+          socraticLogs: [soc],
+        });
+      } else {
+        existing.socraticQuestionsCount = Math.max(existing.socraticQuestionsCount || 0, 1);
+      }
     }
   });
 
