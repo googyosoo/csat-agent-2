@@ -86,115 +86,7 @@ function loadAnalyticsFromFile(): { students: ServerStudentActivity[]; socraticL
   return { students: [], socraticLogs: [], learningEvents: [], transformedQuestions: [] };
 }
 
-const SERVER_SEED_STUDENTS: ServerStudentActivity[] = [
-  {
-    id: 'std-20101-minjun',
-    email: '20101_minjun@simin.hs.kr',
-    name: '20101 김민준',
-    loginCount: 14,
-    lastLogin: new Date(Date.now() - 1000 * 60 * 12).toLocaleString('ko-KR'),
-    totalDwellTimeMinutes: 84,
-    completedPassagesCount: 8,
-    transformedQuestionsGenerated: 15,
-    quizAccuracyPercentage: 92,
-    socraticQuestionsCount: 4,
-    status: 'online',
-  },
-  {
-    id: 'std-20102-seoyeon',
-    email: '20102_seoyeon@simin.hs.kr',
-    name: '20102 이서연',
-    loginCount: 19,
-    lastLogin: new Date(Date.now() - 1000 * 60 * 28).toLocaleString('ko-KR'),
-    totalDwellTimeMinutes: 110,
-    completedPassagesCount: 12,
-    transformedQuestionsGenerated: 22,
-    quizAccuracyPercentage: 96,
-    socraticQuestionsCount: 5,
-    status: 'online',
-  },
-  {
-    id: 'std-20103-dohyun',
-    email: '20103_dohyun@simin.hs.kr',
-    name: '20103 박도현',
-    loginCount: 9,
-    lastLogin: new Date(Date.now() - 1000 * 60 * 45).toLocaleString('ko-KR'),
-    totalDwellTimeMinutes: 62,
-    completedPassagesCount: 6,
-    transformedQuestionsGenerated: 11,
-    quizAccuracyPercentage: 88,
-    socraticQuestionsCount: 3,
-    status: 'offline',
-  },
-  {
-    id: 'std-guest-simin',
-    email: 'guest_student@simin.hs.kr',
-    name: '학습자 (미로그인 게스트)',
-    loginCount: 5,
-    lastLogin: new Date(Date.now() - 1000 * 60 * 5).toLocaleString('ko-KR'),
-    totalDwellTimeMinutes: 35,
-    completedPassagesCount: 4,
-    transformedQuestionsGenerated: 6,
-    quizAccuracyPercentage: 89,
-    socraticQuestionsCount: 2,
-    status: 'online',
-  },
-];
 
-const SERVER_SEED_SOCRATIC: any[] = [
-  {
-    id: 'soc-seed-01',
-    studentEmail: 'guest_student@simin.hs.kr',
-    studentName: '학습자 (미로그인 게스트)',
-    passageTitle: '리얼리즘 소설과 허구적 사실의 성격',
-    lesson: '실전 모의고사 3회',
-    itemNo: '29번 (p.131)',
-    timestamp: new Date(Date.now() - 1000 * 60 * 6).toLocaleString('ko-KR'),
-    studentQuestionSnippet: '실제 보고서를 그대로 가져와 소설이라고 명명하는 순간 독자의 태도가 사실 여부(factual truth)에서 보편적 도덕 진리(general moral truth)를 찾는 것으로 전환된다는 마지막 문장이 큰 울림을 주었습니다. 문학의 본질적 가치에 대해 다시 생각해 보게 되었습니다.',
-    aiHintLevel: 1,
-    keyTopic: '실전 3회 29번 허구적 명제와 도덕적 진리 탐구',
-    metacognitiveStatus: '우수 (구문 파악 성공)',
-  },
-  {
-    id: 'soc-seed-02',
-    studentEmail: '20101_minjun@simin.hs.kr',
-    studentName: '20101 김민준',
-    passageTitle: '놀이와 일의 경계 및 기준 충족의 문제',
-    lesson: '실전 모의고사 3회',
-    itemNo: '30번 (p.131)',
-    timestamp: new Date(Date.now() - 1000 * 60 * 18).toLocaleString('ko-KR'),
-    studentQuestionSnippet: '아리스토텔레스가 지적한 "기준 충족에 대한 관심이 과도해질 때 놀이가 노동으로 변질된다"는 결론부가 인상 깊었습니다. 5번 moderate가 문맥상 과도한 집착을 뜻하는 excessive로 바뀌어야 정답이라는 것을 도출했습니다. 배움의 즐거움을 잃지 않는 학습 태도를 유지해야겠다고 느꼈습니다.',
-    aiHintLevel: 1,
-    keyTopic: '실전 3회 30번 놀이의 본질과 변질 원인 분석',
-    metacognitiveStatus: '우수 (구문 파악 성공)',
-  },
-  {
-    id: 'soc-seed-03',
-    studentEmail: '20102_seoyeon@simin.hs.kr',
-    studentName: '20102 이서연',
-    passageTitle: '리얼리즘 소설과 허구적 사실의 성격',
-    lesson: '실전 모의고사 3회',
-    itemNo: '29번 (p.131)',
-    timestamp: new Date(Date.now() - 1000 * 60 * 32).toLocaleString('ko-KR'),
-    studentQuestionSnippet: 'A번 대동사 문제에서 "Lies are designed to deceive, whereas Lord of the Flies is not"의 is가 대동사로 쓰인 원리를 이해했습니다. 일반동사 deceive의 대동사로 does를 쓸 뻔했으나 수동태 be designed를 받아야 한다는 것을 파악했습니다. 세특 탐구로 "문학 텍스트의 허구성 명제와 언어철학"을 연계하고 싶습니다.',
-    aiHintLevel: 1,
-    keyTopic: '실전 3회 29번 대동사 be/do 판별 및 허구명제 탐구',
-    metacognitiveStatus: '우수 (구문 파악 성공)',
-  },
-  {
-    id: 'soc-seed-04',
-    studentEmail: '20103_dohyun@simin.hs.kr',
-    studentName: '20103 박도현',
-    passageTitle: '놀이와 일의 경계 및 기준 충족의 문제',
-    lesson: '실전 모의고사 3회',
-    itemNo: '30번 (p.131)',
-    timestamp: new Date(Date.now() - 1000 * 60 * 50).toLocaleString('ko-KR'),
-    studentQuestionSnippet: 'Henry Curtis의 "놀이가 연습의 동기를 부여한다"는 주장을 읽고 야구 선수의 고된 연습이 놀이적 동기에서 비롯된다는 점에 공감했습니다. delayed reward(지연된 보상) 개념과 결부하여 심리학적 관점에서 지문을 분석해 보았습니다.',
-    aiHintLevel: 2,
-    keyTopic: '실전 3회 30번 지연된 보상과 내적 동기 분석',
-    metacognitiveStatus: '보통 (힌트 유도 필요)',
-  },
-];
 
 function saveAnalyticsToFile(data: { students: ServerStudentActivity[]; socraticLogs: any[]; learningEvents: any[]; transformedQuestions?: any[] }) {
   try {
@@ -211,26 +103,16 @@ function saveAnalyticsToFile(data: { students: ServerStudentActivity[]; socratic
   }
 }
 
-// Initial hydration from disk + seed data
+// Initial hydration from disk
 const initialStore = loadAnalyticsFromFile();
 const globalStudentsMap = new Map<string, ServerStudentActivity>();
-
-SERVER_SEED_STUDENTS.forEach((s) => {
-  globalStudentsMap.set(s.email.toLowerCase().trim(), s);
-});
 
 initialStore.students.forEach((s) => {
   if (s && s.email) globalStudentsMap.set(s.email.toLowerCase().trim(), s);
 });
 
-const socMap = new Map<string, any>();
-SERVER_SEED_SOCRATIC.forEach((s) => socMap.set(s.id, s));
-(initialStore.socraticLogs || []).forEach((s: any) => {
-  if (s && s.id) socMap.set(s.id, s);
-});
-
-let globalSocraticLogs: any[] = Array.from(socMap.values());
-let globalLearningEvents: any[] = initialStore.learningEvents;
+let globalSocraticLogs: any[] = initialStore.socraticLogs || [];
+let globalLearningEvents: any[] = initialStore.learningEvents || [];
 let globalTransformedQuestions: any[] = initialStore.transformedQuestions || [];
 
 // Analytics Sync API: Student client reports activity (supports single or bulk sync)

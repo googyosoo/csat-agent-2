@@ -799,8 +799,21 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
               </div>
             </div>
 
-            {/* Reflection Top Count Badge */}
-            <div className="flex items-center space-x-2 text-xs">
+            {/* Reflection Top Count Badge & Manual Deep Scan Button */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  loadData();
+                  triggerToast('🔍 브라우저에 저장된 이전 학생 소감 및 작업 기록을 전수 스캔하여 복원했습니다!');
+                }}
+                className="px-3 py-1.5 bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 hover:text-white border border-purple-500/40 rounded-xl font-bold transition-all flex items-center space-x-1.5 shadow-sm"
+                title="이전 세션이나 브라우저에 기록된 모든 로컬 작업 데이터를 즉시 전수 스캔하여 불러옵니다."
+              >
+                <i className="fa-solid fa-rotate"></i>
+                <span>저장된 과거 기록 전체 스캔 불러오기</span>
+              </button>
+
               <div className="px-3 py-1.5 bg-slate-950 rounded-xl border border-slate-800 text-slate-300 flex items-center space-x-2">
                 <span className="text-slate-400">현재 표시 소감:</span>
                 <strong className="text-rose-400 font-mono font-bold">{filteredStudentReflections.length}건</strong>
