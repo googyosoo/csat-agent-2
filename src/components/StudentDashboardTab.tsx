@@ -9,6 +9,7 @@ import {
   getStoredLearningEvents,
   fetchServerAnalyticsData,
   ensureStudentRecord,
+  autoSyncAllLocalDataToCloud,
 } from '../lib/analytics';
 
 interface StudentDashboardTabProps {
@@ -16,7 +17,7 @@ interface StudentDashboardTabProps {
 }
 
 export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUser }) => {
-  const currentEmail = (authUser?.email || 'guest_student@simin.hs.kr').toLowerCase();
+  const currentEmail = (authUser?.email || 'guest_student@simin.hs.kr').toLowerCase().trim();
   const currentName = authUser?.displayName || (authUser?.email ? authUser.email.split('@')[0] : '학습자');
 
   const [myActivity, setMyActivity] = useState<StudentActivity | null>(null);
@@ -24,32 +25,55 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
   const [myLearningEvents, setMyLearningEvents] = useState<LearningEvent[]>([]);
 
   const loadMyData = async () => {
-    // 1. Ensure local record
+    // 1. Ensure local record and auto-sync local data to cloud
     const { students, idx } = ensureStudentRecord(currentEmail, currentName);
     let currentRecord = students[idx] || null;
 
-    // 2. Hydrate from server & Firestore
+    // Trigger background sync of any legacy/local records to server & Firestore
+    autoSyncAllLocalDataToCloud();
+
+    // 2. Hydrate from server & Firestore & Local
+    const localSoc = getStoredSocraticSummaries().filter(
+      (s) => (s.studentEmail || '').toLowerCase().trim() === currentEmail
+    );
+    const localEv = getStoredLearningEvents().filter(
+      (e) => (e.studentEmail || '').toLowerCase().trim() === currentEmail
+    );
+
     try {
       const serverData = await fetchServerAnalyticsData();
       const matched = serverData.students.find(
-        (s) => s.email.toLowerCase() === currentEmail
+        (s) => (s.email || '').toLowerCase().trim() === currentEmail
       );
       if (matched) {
         currentRecord = { ...currentRecord, ...matched };
       }
       const filteredSoc = serverData.socraticLogs.filter(
-        (s) => s.studentEmail.toLowerCase() === currentEmail
+        (s) => (s.studentEmail || '').toLowerCase().trim() === currentEmail
       );
       const filteredEv = serverData.learningEvents.filter(
-        (e) => e.studentEmail.toLowerCase() === currentEmail
+        (e) => (e.studentEmail || '').toLowerCase().trim() === currentEmail
       );
-      setMySocraticLogs(filteredSoc);
-      setMyLearningEvents(filteredEv);
+
+      // Merge server and local without duplicates
+      const mergedSocMap = new Map<string, SocraticSummary>();
+      [...filteredSoc, ...localSoc].forEach((s) => {
+        if (s) {
+          const key = s.id || `${s.passageTitle}_${s.studentQuestionSnippet?.slice(0, 30)}`;
+          mergedSocMap.set(key, s);
+        }
+      });
+
+      const mergedEvMap = new Map<string, LearningEvent>();
+      [...filteredEv, ...localEv].forEach((e) => {
+        if (e && e.id) mergedEvMap.set(e.id, e);
+      });
+
+      setMySocraticLogs(Array.from(mergedSocMap.values()));
+      setMyLearningEvents(Array.from(mergedEvMap.values()));
     } catch (e) {
-      const socSummaries = getStoredSocraticSummaries();
-      setMySocraticLogs(socSummaries.filter((s) => s.studentEmail.toLowerCase() === currentEmail));
-      const events = getStoredLearningEvents();
-      setMyLearningEvents(events.filter((e) => e.studentEmail.toLowerCase() === currentEmail));
+      setMySocraticLogs(localSoc);
+      setMyLearningEvents(localEv);
     }
 
     setMyActivity(currentRecord);

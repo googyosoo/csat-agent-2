@@ -46,6 +46,7 @@ export interface AnalyticsMetrics {
 
 const STORAGE_KEY_STUDENTS = 'csat_analytics_students_v1';
 const STORAGE_KEY_SOCRATIC = 'csat_analytics_socratic_v1';
+const STORAGE_KEY_LEARNING_EVENTS = 'csat_analytics_learning_events_v1';
 
 /**
  * Deterministic Korean Date Parser that parses:
@@ -116,8 +117,11 @@ export function notifyAnalyticsUpdated() {
  */
 export async function syncAnalyticsToServer(data: {
   student?: StudentActivity;
+  students?: StudentActivity[];
   socraticLog?: SocraticSummary;
+  socraticLogs?: SocraticSummary[];
   learningEvent?: any;
+  learningEvents?: any[];
 }): Promise<void> {
   notifyAnalyticsUpdated();
   try {
@@ -125,6 +129,53 @@ export async function syncAnalyticsToServer(data: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+    });
+  } catch (e) {}
+}
+
+/**
+ * Universal Auto-Sync: Guarantees that ALL locally accumulated student logs & reflections
+ * are immediately uploaded to both Backend Server & Firestore DB so teachers can see them.
+ */
+export async function autoSyncAllLocalDataToCloud(): Promise<void> {
+  try {
+    const localStudents = getStoredStudentActivities();
+    const localSocratic = getStoredSocraticSummaries();
+    const localEvents = getStoredLearningEvents();
+
+    if (localStudents.length === 0 && localSocratic.length === 0 && localEvents.length === 0) {
+      return;
+    }
+
+    // 1. Bulk push to Backend Server API
+    await fetch('/api/analytics/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        students: localStudents,
+        socraticLogs: localSocratic,
+        learningEvents: localEvents,
+      }),
+    }).catch(() => {});
+
+    // 2. Parallel upload to Firestore
+    localSocratic.forEach((log) => {
+      if (log && log.id) {
+        setDoc(doc(db, 'socratic_logs', log.id), log, { merge: true }).catch(() => {});
+      }
+    });
+
+    localEvents.forEach((ev) => {
+      if (ev && ev.id) {
+        setDoc(doc(db, 'learningEvents', ev.id), ev, { merge: true }).catch(() => {});
+      }
+    });
+
+    localStudents.forEach((std) => {
+      if (std && std.email) {
+        const docId = std.email.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
+        setDoc(doc(db, 'students', docId), std, { merge: true }).catch(() => {});
+      }
     });
   } catch (e) {}
 }
@@ -170,18 +221,28 @@ async function fetchFirestoreWithTimeout(timeoutMs = 3500): Promise<{
         students.push(sData);
         // Also extract any student-nested logs
         if (sData.socraticLogs && Array.isArray(sData.socraticLogs)) {
-          sData.socraticLogs.forEach((l) => socraticLogs.push(l));
+          sData.socraticLogs.forEach((l) => {
+            if (l) socraticLogs.push(l);
+          });
         }
         if (sData.learningEvents && Array.isArray(sData.learningEvents)) {
-          sData.learningEvents.forEach((e) => learningEvents.push(e));
+          sData.learningEvents.forEach((e) => {
+            if (e) learningEvents.push(e);
+          });
         }
       });
     }
     if (socSnap.status === 'fulfilled' && !socSnap.value.empty) {
-      socSnap.value.forEach((d) => socraticLogs.push(d.data() as SocraticSummary));
+      socSnap.value.forEach((d) => {
+        const item = d.data() as SocraticSummary;
+        if (item) socraticLogs.push(item);
+      });
     }
     if (evtSnap.status === 'fulfilled' && !evtSnap.value.empty) {
-      evtSnap.value.forEach((d) => learningEvents.push(d.data() as LearningEvent));
+      evtSnap.value.forEach((d) => {
+        const item = d.data() as LearningEvent;
+        if (item) learningEvents.push(item);
+      });
     }
 
     const result = { students, socraticLogs, learningEvents, lastFetched: Date.now() };
@@ -307,6 +368,9 @@ export async function fetchServerAnalyticsData(): Promise<{
     }
   });
 
+  // 4. Background auto-sync local data to cloud so other users (teachers) can see it
+  autoSyncAllLocalDataToCloud();
+
   return {
     students: Array.from(studentMap.values()),
     socraticLogs: Array.from(socMap.values()),
@@ -314,24 +378,54 @@ export async function fetchServerAnalyticsData(): Promise<{
   };
 }
 
+const ALL_STUDENT_STORAGE_KEYS = [
+  'csat_analytics_students_v1',
+  'csat_analytics_students',
+  'csat_students',
+  'students_activities',
+];
+
 /**
- * Get stored student activities from localStorage
+ * Get stored student activities from localStorage with legacy key fallback
  */
 export function getStoredStudentActivities(): StudentActivity[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_STUDENTS);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  const map = new Map<string, StudentActivity>();
+
+  ALL_STUDENT_STORAGE_KEYS.forEach((key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((s) => {
+          if (s && s.email) {
+            const eKey = s.email.toLowerCase().trim();
+            const existing = map.get(eKey);
+            if (!existing) {
+              map.set(eKey, s);
+            } else {
+              map.set(eKey, {
+                ...existing,
+                ...s,
+                loginCount: Math.max(existing.loginCount || 1, s.loginCount || 1),
+                totalDwellTimeMinutes: Math.max(existing.totalDwellTimeMinutes || 0, s.totalDwellTimeMinutes || 0),
+                completedPassagesCount: Math.max(existing.completedPassagesCount || 0, s.completedPassagesCount || 0),
+                transformedQuestionsGenerated: Math.max(existing.transformedQuestionsGenerated || 0, s.transformedQuestionsGenerated || 0),
+                socraticQuestionsCount: Math.max(existing.socraticQuestionsCount || 0, s.socraticQuestionsCount || 0),
+              });
+            }
+          }
+        });
+      }
+    } catch {}
+  });
+
+  return Array.from(map.values());
 }
 
 /**
  * Helper to guarantee student record exists in array
  */
-
 export function ensureStudentRecord(emailInput?: string | null, nameInput?: string | null): { students: StudentActivity[]; idx: number } {
   const cleanEmail = (emailInput && emailInput.trim()) ? emailInput.trim().toLowerCase() : 'guest_student@simin.hs.kr';
   const cleanName = (nameInput && nameInput.trim()) ? nameInput.trim() : (cleanEmail.includes('@') ? cleanEmail.split('@')[0] : '학습자');
@@ -366,6 +460,9 @@ export function ensureStudentRecord(emailInput?: string | null, nameInput?: stri
   } else {
     students[idx].status = 'online';
     students[idx].lastLogin = nowStr;
+    if (nameInput && nameInput.trim()) {
+      students[idx].name = nameInput.trim();
+    }
   }
 
   try {
@@ -396,17 +493,67 @@ export async function fetchFirestoreStudentActivities(): Promise<StudentActivity
   }
 }
 
+const ALL_SOCRATIC_STORAGE_KEYS = [
+  'csat_analytics_socratic_v1',
+  'csat_analytics_socratic_summaries',
+  'csat_socratic_logs',
+  'socratic_summaries',
+  'csat_analytics_socratic',
+];
+
 /**
- * Get stored Socratic conversation summaries from localStorage
+ * Get stored Socratic conversation summaries from localStorage across all legacy keys
+ * with comprehensive normalization and missing-field repair
  */
 export function getStoredSocraticSummaries(): SocraticSummary[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_SOCRATIC);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
+  const socMap = new Map<string, SocraticSummary>();
+
+  ALL_SOCRATIC_STORAGE_KEYS.forEach((key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((item: any, idx: number) => {
+          if (!item) return;
+          const email = (item.studentEmail || item.email || 'guest_student@simin.hs.kr').trim();
+          const name = item.studentName || item.name || (email.includes('@') ? email.split('@')[0] : '학습자');
+          const snippet = (
+            item.studentQuestionSnippet ||
+            item.questionText ||
+            item.content ||
+            item.reasonText ||
+            item.text ||
+            item.comment ||
+            ''
+          ).trim();
+
+          const id = item.id || `soc-recovered-${idx}-${Date.now()}`;
+          const normalized: SocraticSummary = {
+            id,
+            studentEmail: email,
+            studentName: name,
+            passageTitle: item.passageTitle || 'EBS 수능 지문',
+            lesson: item.lesson || '',
+            itemNo: item.itemNo || '',
+            timestamp: item.timestamp || new Date().toLocaleString('ko-KR'),
+            studentQuestionSnippet: snippet,
+            aiHintLevel: item.aiHintLevel || 1,
+            keyTopic: item.keyTopic || `${item.lesson || ''} ${item.itemNo || ''} 지문 학습 성찰`.trim(),
+            metacognitiveStatus: item.metacognitiveStatus || '우수 (구문 파악 성공)',
+          };
+
+          // Use dedup key of id or email+content
+          const dedup = id || `${email.toLowerCase()}_${snippet.slice(0, 30)}`;
+          if (!socMap.has(dedup)) {
+            socMap.set(dedup, normalized);
+          }
+        });
+      }
+    } catch {}
+  });
+
+  return Array.from(socMap.values());
 }
 
 /**
@@ -623,16 +770,53 @@ export interface LearningEvent {
   timestamp: string;
 }
 
-const STORAGE_KEY_LEARNING_EVENTS = 'csat_analytics_learning_events_v1';
+const ALL_EVENT_STORAGE_KEYS = [
+  'csat_analytics_learning_events_v1',
+  'csat_analytics_learning_events',
+  'csat_learning_events',
+  'learning_events',
+];
 
 export function getStoredLearningEvents(): LearningEvent[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_LEARNING_EVENTS);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
+  const eventMap = new Map<string, LearningEvent>();
+
+  ALL_EVENT_STORAGE_KEYS.forEach((key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((e: any, idx: number) => {
+          if (!e) return;
+          const id = e.id || `evt-recovered-${idx}-${Date.now()}`;
+          const email = (e.studentEmail || e.email || 'guest_student@simin.hs.kr').trim();
+          const normalized: LearningEvent = {
+            id,
+            studentEmail: email,
+            studentName: e.studentName || e.name || (email.includes('@') ? email.split('@')[0] : '학습자'),
+            passageId: e.passageId || '',
+            passageTitle: e.passageTitle || '수능 영어 지문',
+            lesson: e.lesson || '',
+            itemNo: e.itemNo || '',
+            questionType: e.questionType || (e.reasonText ? '지문 학습 소감 & 세특' : '변형문제 풀이'),
+            difficulty: e.difficulty || '',
+            selectedIndex: e.selectedIndex,
+            correctIndex: e.correctIndex,
+            isCorrect: e.isCorrect,
+            reasonText: e.reasonText || e.content || '',
+            elapsedMs: e.elapsedMs || 0,
+            timestamp: e.timestamp || new Date().toISOString(),
+          };
+
+          if (!eventMap.has(id)) {
+            eventMap.set(id, normalized);
+          }
+        });
+      }
+    } catch {}
+  });
+
+  return Array.from(eventMap.values());
 }
 
 export async function recordLearningEvent(event: Omit<LearningEvent, 'id' | 'timestamp'>): Promise<LearningEvent[]> {

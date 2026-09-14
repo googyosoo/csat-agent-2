@@ -15,6 +15,7 @@ import {
   clearAnalyticsData,
   parseToTimestamp,
   formatRelativeTime,
+  autoSyncAllLocalDataToCloud,
 } from '../lib/analytics';
 import { safeFetchJson } from '../lib/api';
 
@@ -166,10 +167,32 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   const [lastSyncTime, setLastSyncTime] = useState<string>('초기화 중...');
 
   const loadData = async () => {
+    // 1. Trigger background cloud sync for any local logs
+    autoSyncAllLocalDataToCloud();
+
+    // 2. Fetch server & firestore data
     const { students: sList, socraticLogs: socList, learningEvents: evList } = await fetchServerAnalyticsData();
+
+    // 3. Guarantee that locally stored summaries in this browser are also merged
+    const localSocs = getStoredSocraticSummaries();
+    const localEvts = getStoredLearningEvents();
+
+    const mergedSocMap = new Map<string, SocraticSummary>();
+    [...socList, ...localSocs].forEach((s) => {
+      if (s) {
+        const key = s.id || `${s.passageTitle}_${(s.studentQuestionSnippet || '').slice(0, 30)}`;
+        mergedSocMap.set(key, s);
+      }
+    });
+
+    const mergedEvMap = new Map<string, LearningEvent>();
+    [...evList, ...localEvts].forEach((e) => {
+      if (e && e.id) mergedEvMap.set(e.id, e);
+    });
+
     setStudents(sList);
-    setSocSummaries(socList);
-    setLearningEvents(evList);
+    setSocSummaries(Array.from(mergedSocMap.values()));
+    setLearningEvents(Array.from(mergedEvMap.values()));
     setLastSyncTime(new Date().toLocaleTimeString('ko-KR'));
   };
 
@@ -262,34 +285,36 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
     // 1. Process learningEvents (quizzes, transformed questions, reflections)
     learningEvents.forEach((ev) => {
+      if (!ev) return;
+      const evEmail = (ev.studentEmail || (ev as any).email || 'guest_student@simin.hs.kr').trim();
       const ts = parseToTimestamp(ev.timestamp) || (ev.id ? parseToTimestamp(ev.id) : 0);
       const isReflection = ev.questionType === '지문 학습 소감 & 세특' || (!ev.questionType && !ev.isCorrect && !!ev.reasonText);
-      const content = (ev.reasonText || '').trim();
+      const content = (ev.reasonText || (ev as any).content || '').trim();
 
       if (isReflection) {
         if (content) {
-          reflectionKeySet.add(`${ev.studentEmail.toLowerCase()}_${content.slice(0, 30)}`);
+          reflectionKeySet.add(`${evEmail.toLowerCase()}_${content.slice(0, 30)}`);
         }
         records.push({
-          id: ev.id,
+          id: ev.id || `evt-ref-${Math.random().toString(36).substring(2, 6)}`,
           sourceType: 'reflection',
-          studentEmail: ev.studentEmail,
-          studentName: ev.studentName || (ev.studentEmail.includes('@') ? ev.studentEmail.split('@')[0] : '학습자'),
+          studentEmail: evEmail,
+          studentName: ev.studentName || (evEmail.includes('@') ? evEmail.split('@')[0] : '학습자'),
           passageTitle: ev.passageTitle || 'EBS 수능 지문',
           lesson: ev.lesson || '',
           itemNo: ev.itemNo || '',
           questionType: '지문 학습 성찰/소감',
           content: content || '지문 구문 및 어휘 탐구 소감 작성',
           rawTimestamp: ts,
-          formattedDate: ts ? new Date(ts).toLocaleString('ko-KR') : ev.timestamp,
+          formattedDate: ts ? new Date(ts).toLocaleString('ko-KR') : (ev.timestamp || '최근'),
           relativeTime: formatRelativeTime(ts),
         });
       } else {
         records.push({
-          id: ev.id,
+          id: ev.id || `evt-quiz-${Math.random().toString(36).substring(2, 6)}`,
           sourceType: 'quiz',
-          studentEmail: ev.studentEmail,
-          studentName: ev.studentName || (ev.studentEmail.includes('@') ? ev.studentEmail.split('@')[0] : '학습자'),
+          studentEmail: evEmail,
+          studentName: ev.studentName || (evEmail.includes('@') ? evEmail.split('@')[0] : '학습자'),
           passageTitle: ev.passageTitle || '수능 영어 변형 문항',
           lesson: ev.lesson || '',
           itemNo: ev.itemNo || '',
@@ -297,7 +322,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
           isCorrect: ev.isCorrect,
           content: content || (ev.isCorrect ? '정답을 올바르게 도출함' : '오답 선택 후 오답 원인 분석'),
           rawTimestamp: ts,
-          formattedDate: ts ? new Date(ts).toLocaleString('ko-KR') : ev.timestamp,
+          formattedDate: ts ? new Date(ts).toLocaleString('ko-KR') : (ev.timestamp || '최근'),
           relativeTime: formatRelativeTime(ts),
         });
       }
@@ -305,8 +330,18 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
     // 2. Process socSummaries
     socSummaries.forEach((soc) => {
-      const text = (soc.studentQuestionSnippet || '').trim();
-      const dedupKey = `${soc.studentEmail.toLowerCase()}_${text.slice(0, 30)}`;
+      if (!soc) return;
+      const email = (soc.studentEmail || (soc as any).email || 'guest_student@simin.hs.kr').trim();
+      const text = (
+        soc.studentQuestionSnippet ||
+        (soc as any).questionText ||
+        (soc as any).content ||
+        (soc as any).reasonText ||
+        (soc as any).text ||
+        ''
+      ).trim();
+
+      const dedupKey = `${email.toLowerCase()}_${text.slice(0, 30)}`;
       if (text && reflectionKeySet.has(dedupKey)) {
         return; // Already added
       }
@@ -314,10 +349,10 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
       const ts = parseToTimestamp(soc.timestamp) || (soc.id ? parseToTimestamp(soc.id) : 0);
       records.push({
-        id: soc.id,
+        id: soc.id || `soc-${Math.random().toString(36).substring(2, 6)}`,
         sourceType: 'reflection',
-        studentEmail: soc.studentEmail,
-        studentName: soc.studentName || (soc.studentEmail.includes('@') ? soc.studentEmail.split('@')[0] : '학습자'),
+        studentEmail: email,
+        studentName: soc.studentName || (email.includes('@') ? email.split('@')[0] : '학습자'),
         passageTitle: soc.passageTitle || 'EBS 수능 지문',
         lesson: soc.lesson || '',
         itemNo: soc.itemNo || '',
@@ -325,17 +360,27 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         content: text || '지문 구문 분석 및 핵심 어휘 학습 소감',
         metacognitiveStatus: soc.metacognitiveStatus,
         rawTimestamp: ts,
-        formattedDate: soc.timestamp,
+        formattedDate: soc.timestamp || (ts ? new Date(ts).toLocaleString('ko-KR') : '최근'),
         relativeTime: formatRelativeTime(ts),
       });
     });
 
     // 3. Process nested socraticLogs and learningEvents from students array directly
     students.forEach((std) => {
+      if (!std) return;
+      const stdEmail = (std.email || 'guest_student@simin.hs.kr').trim();
+
       if (std.socraticLogs && Array.isArray(std.socraticLogs)) {
         std.socraticLogs.forEach((soc) => {
-          const text = (soc.studentQuestionSnippet || '').trim();
-          const dedupKey = `${std.email.toLowerCase()}_${text.slice(0, 30)}`;
+          if (!soc) return;
+          const text = (
+            soc.studentQuestionSnippet ||
+            (soc as any).questionText ||
+            (soc as any).content ||
+            (soc as any).reasonText ||
+            ''
+          ).trim();
+          const dedupKey = `${stdEmail.toLowerCase()}_${text.slice(0, 30)}`;
           if (text && reflectionKeySet.has(dedupKey)) return;
           if (text) reflectionKeySet.add(dedupKey);
 
@@ -343,7 +388,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
           records.push({
             id: soc.id || `soc-std-${Math.random().toString(36).substring(2, 6)}`,
             sourceType: 'reflection',
-            studentEmail: std.email,
+            studentEmail: stdEmail,
             studentName: std.name || soc.studentName || '학습자',
             passageTitle: soc.passageTitle || 'EBS 수능 지문',
             lesson: soc.lesson || '',
@@ -352,19 +397,19 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
             content: text || '지문 구문 분석 및 핵심 어휘 학습 소감',
             metacognitiveStatus: soc.metacognitiveStatus,
             rawTimestamp: ts,
-            formattedDate: soc.timestamp,
+            formattedDate: soc.timestamp || (ts ? new Date(ts).toLocaleString('ko-KR') : '최근'),
             relativeTime: formatRelativeTime(ts),
           });
         });
       }
       if (std.learningEvents && Array.isArray(std.learningEvents)) {
         std.learningEvents.forEach((ev) => {
-          if (records.some((r) => r.id === ev.id)) return;
+          if (!ev || records.some((r) => r.id === ev.id)) return;
           const ts = parseToTimestamp(ev.timestamp) || (ev.id ? parseToTimestamp(ev.id) : 0);
           records.push({
-            id: ev.id,
+            id: ev.id || `evt-std-${Math.random().toString(36).substring(2, 6)}`,
             sourceType: 'quiz',
-            studentEmail: std.email,
+            studentEmail: stdEmail,
             studentName: std.name || ev.studentName || '학습자',
             passageTitle: ev.passageTitle || '수능 영어 변형 문항',
             lesson: ev.lesson || '',
@@ -373,7 +418,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
             isCorrect: ev.isCorrect,
             content: ev.reasonText || (ev.isCorrect ? '정답을 올바르게 도출함' : '오답 선택 후 오답 원인 분석'),
             rawTimestamp: ts,
-            formattedDate: ts ? new Date(ts).toLocaleString('ko-KR') : ev.timestamp,
+            formattedDate: ts ? new Date(ts).toLocaleString('ko-KR') : (ev.timestamp || '최근'),
             relativeTime: formatRelativeTime(ts),
           });
         });
@@ -389,13 +434,45 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
     return allUnifiedRecords.filter((r) => r.sourceType === 'reflection');
   }, [allUnifiedRecords]);
 
+  // Unique students who have written reflections (plus all registered students)
+  const allStudentsInReflections = React.useMemo(() => {
+    const studentMap = new Map<string, { email: string; name: string; reflectionCount: number }>();
+
+    // 1. First add all registered students
+    students.forEach((s) => {
+      if (s && s.email) {
+        const key = s.email.toLowerCase().trim();
+        studentMap.set(key, { email: s.email, name: s.name, reflectionCount: 0 });
+      }
+    });
+
+    // 2. Count reflections and add any non-registered authors (e.g. guest students)
+    allReflectionsOnly.forEach((r) => {
+      const email = (r.studentEmail || 'guest_student@simin.hs.kr').trim();
+      const key = email.toLowerCase();
+      const existing = studentMap.get(key);
+      if (existing) {
+        existing.reflectionCount += 1;
+      } else {
+        studentMap.set(key, {
+          email,
+          name: r.studentName || '학습자',
+          reflectionCount: 1,
+        });
+      }
+    });
+
+    return Array.from(studentMap.values());
+  }, [students, allReflectionsOnly]);
+
   // Filtered & Sorted Student Reflections for Dedicated Reflection Section (최근 순 / 학생별 필터링)
   const filteredStudentReflections = React.useMemo(() => {
     let list = allReflectionsOnly;
 
     // 1. 학생별 필터링
     if (reflectionStudentFilter !== 'all') {
-      list = list.filter((r) => r.studentEmail.toLowerCase() === reflectionStudentFilter.toLowerCase());
+      const filterKey = reflectionStudentFilter.toLowerCase().trim();
+      list = list.filter((r) => (r.studentEmail || '').toLowerCase().trim() === filterKey);
     }
 
     // 2. 검색어 필터링
@@ -693,6 +770,310 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         </div>
       )}
 
+      {/* ✍️ Dedicated Student Reflections (학습 소감 / 댓글) 모아보기 Section (Top Primary Section) */}
+      {(activeMainTab === 'all' || activeMainTab === 'reflections') && (
+        <div id="student-reflections-section" className="bg-slate-900 border border-rose-500/30 rounded-3xl p-6 shadow-2xl space-y-5">
+          {/* Section Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center text-xl font-bold shadow-inner">
+                <i className="fa-solid fa-comments"></i>
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-base font-bold text-white tracking-tight">
+                    ✍️ 학생별 지문 학습 소감(댓글) 모아보기
+                  </h3>
+                  <span className="px-2.5 py-0.5 bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-lg font-mono">
+                    총 {allReflectionsOnly.length}건
+                  </span>
+                  {activeMainTab === 'reflections' && (
+                    <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold rounded-md">
+                      전용 뷰 모드
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  학생들이 지문 학습 후 직접 작성한 구문 탐구 소감 및 성찰 댓글을 학생별로 필터링하고 최신순으로 확인할 수 있습니다.
+                </p>
+              </div>
+            </div>
+
+            {/* Reflection Top Count Badge */}
+            <div className="flex items-center space-x-2 text-xs">
+              <div className="px-3 py-1.5 bg-slate-950 rounded-xl border border-slate-800 text-slate-300 flex items-center space-x-2">
+                <span className="text-slate-400">현재 표시 소감:</span>
+                <strong className="text-rose-400 font-mono font-bold">{filteredStudentReflections.length}건</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Filtering & Sorting Controls Bar */}
+          <div className="bg-slate-950/90 border border-slate-800 p-4 rounded-2xl space-y-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              {/* 1) Student Filter Dropdown & Reset */}
+              <div className="flex flex-wrap items-center gap-2 flex-1">
+                <span className="text-xs font-bold text-slate-300 flex items-center space-x-1.5 shrink-0">
+                  <i className="fa-solid fa-user-check text-rose-400"></i>
+                  <span>1) 학생별 필터:</span>
+                </span>
+                <select
+                  value={reflectionStudentFilter}
+                  onChange={(e) => setReflectionStudentFilter(e.target.value)}
+                  className="bg-slate-900 text-slate-200 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:outline-none focus:border-rose-500 font-medium"
+                >
+                  <option value="all">전체 학생 소감 보기 (총 {allReflectionsOnly.length}건)</option>
+                  {allStudentsInReflections
+                    .sort((a, b) => b.reflectionCount - a.reflectionCount)
+                    .map((std) => (
+                      <option key={std.email} value={std.email}>
+                        {std.name} ({std.email}) - {std.reflectionCount}건
+                      </option>
+                    ))}
+                </select>
+
+                {reflectionStudentFilter !== 'all' && (
+                  <button
+                    onClick={() => setReflectionStudentFilter('all')}
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 text-xs font-semibold rounded-xl transition-all flex items-center space-x-1"
+                  >
+                    <i className="fa-solid fa-xmark"></i>
+                    <span>필터 해제</span>
+                  </button>
+                )}
+              </div>
+
+              {/* 2) Sort Order Toggle (최근 순 / 오래된 순) */}
+              <div className="flex items-center space-x-2 shrink-0">
+                <span className="text-xs font-bold text-slate-300 flex items-center space-x-1">
+                  <i className="fa-solid fa-arrow-down-wide-short text-cyan-400"></i>
+                  <span>2) 정렬:</span>
+                </span>
+                <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
+                  <button
+                    onClick={() => setReflectionSortOrder('latest')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                      reflectionSortOrder === 'latest'
+                        ? 'bg-rose-600 text-white shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="최신 작성된 소감부터 내림차순 정렬"
+                  >
+                    <i className="fa-solid fa-clock-rotate-left"></i>
+                    <span>최근 순 (기본)</span>
+                  </button>
+                  <button
+                    onClick={() => setReflectionSortOrder('oldest')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                      reflectionSortOrder === 'oldest'
+                        ? 'bg-rose-600 text-white shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                    title="과거 작성된 소감부터 오름차순 정렬"
+                  >
+                    <i className="fa-solid fa-arrow-up-1-9"></i>
+                    <span>오래된 순</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Keyword Search & Quick Student Chips */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-900">
+              <div className="relative flex-1 max-w-md">
+                <input
+                  type="text"
+                  value={reflectionSearch}
+                  onChange={(e) => setReflectionSearch(e.target.value)}
+                  placeholder="소감 내용, 지문명, 학생명 실시간 검색..."
+                  className="w-full bg-slate-900 text-slate-200 text-xs pl-8 pr-8 py-2 rounded-xl border border-slate-800 focus:outline-none focus:border-rose-500"
+                />
+                <i className="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-500"></i>
+                {reflectionSearch && (
+                  <button
+                    onClick={() => setReflectionSearch('')}
+                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200 text-xs"
+                  >
+                    <i className="fa-solid fa-circle-xmark"></i>
+                  </button>
+                )}
+              </div>
+
+              {/* Quick Filter Chips for active students */}
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] overflow-x-auto py-1">
+                <span className="text-slate-500 shrink-0">빠른 선택:</span>
+                <button
+                  onClick={() => setReflectionStudentFilter('all')}
+                  className={`px-2 py-1 rounded-lg font-bold transition-all ${
+                    reflectionStudentFilter === 'all'
+                      ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50'
+                      : 'bg-slate-900 text-slate-400 hover:text-slate-300 border border-slate-800'
+                  }`}
+                >
+                  전체
+                </button>
+                {allStudentsInReflections
+                  .sort((a, b) => b.reflectionCount - a.reflectionCount)
+                  .slice(0, 8)
+                  .map((std) => {
+                    const isSelected = reflectionStudentFilter.toLowerCase() === std.email.toLowerCase();
+                    return (
+                      <button
+                        key={std.email}
+                        onClick={() => setReflectionStudentFilter(std.email)}
+                        className={`px-2 py-1 rounded-lg font-bold transition-all flex items-center space-x-1 shrink-0 ${
+                          isSelected
+                            ? 'bg-rose-600 text-white shadow'
+                            : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                        }`}
+                      >
+                        <span>{std.name}</span>
+                        <span className={`text-[10px] font-mono px-1 rounded ${isSelected ? 'bg-rose-700 text-rose-100' : 'bg-slate-800 text-rose-400'}`}>
+                          {std.reflectionCount}
+                        </span>
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          </div>
+
+          {/* Reflection Cards Feed */}
+          {filteredStudentReflections.length === 0 ? (
+            <div className="py-14 text-center space-y-3 bg-slate-950/60 rounded-2xl border border-slate-800/80">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center text-2xl mx-auto border border-rose-500/20">
+                <i className="fa-solid fa-comment-slash"></i>
+              </div>
+              <p className="text-sm font-bold text-slate-300">
+                {reflectionStudentFilter !== 'all' || reflectionSearch
+                  ? '선택한 조건에 해당하는 학생 학습 소감이 없습니다.'
+                  : '아직 수집된 학생 학습 소감 데이터가 없습니다.'}
+              </p>
+              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                학생들이 지문 학습 화면에서 작성한 구문 분석 소감 및 성찰 댓글이 실시간으로 이곳에 표시됩니다.
+              </p>
+              {(reflectionStudentFilter !== 'all' || reflectionSearch) && (
+                <button
+                  onClick={() => {
+                    setReflectionStudentFilter('all');
+                    setReflectionSearch('');
+                  }}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-rose-300 text-xs font-bold rounded-xl border border-slate-700 transition-all"
+                >
+                  모든 소감 다시 보기
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredStudentReflections.map((item) => {
+                  const studentObj = students.find((s) => s.email.toLowerCase() === item.studentEmail.toLowerCase());
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-slate-950/90 border border-slate-800 hover:border-rose-500/40 rounded-2xl p-4 transition-all hover:shadow-xl hover:shadow-rose-950/10 flex flex-col justify-between space-y-3"
+                    >
+                      {/* Card Header: Student & Time */}
+                      <div>
+                        <div className="flex items-center justify-between gap-2 border-b border-slate-900 pb-2.5">
+                          <div className="flex items-center space-x-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 to-pink-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                              {item.studentName.slice(0, 1)}
+                            </div>
+                            <div>
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => setReflectionStudentFilter(item.studentEmail)}
+                                  className="text-xs font-bold text-white hover:text-rose-300 transition-colors cursor-pointer text-left"
+                                  title="이 학생의 소감만 필터링"
+                                >
+                                  {item.studentName}
+                                </button>
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  {item.studentEmail}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-400 font-medium truncate max-w-[240px]">
+                                {item.lesson && <span className="text-purple-400 font-bold mr-1">[{item.lesson}]</span>}
+                                {item.itemNo && <span className="text-cyan-400 mr-1">{item.itemNo}</span>}
+                                <span>{item.passageTitle}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Relative & Absolute Timestamp */}
+                          <div className="text-right shrink-0">
+                            <span
+                              className="px-2 py-0.5 bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[10px] font-bold rounded-md"
+                              title={item.formattedDate}
+                            >
+                              {item.relativeTime}
+                            </span>
+                            <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                              {item.formattedDate.slice(0, 16)}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card Body: Student's Actual Reflection / Comment */}
+                        <div className="mt-3 relative">
+                          <div className="p-3.5 bg-slate-900/90 rounded-xl border border-slate-800 text-slate-100 text-xs leading-relaxed font-sans whitespace-pre-wrap selection:bg-rose-500 selection:text-white shadow-inner">
+                            <div className="flex items-start space-x-2">
+                              <i className="fa-solid fa-quote-left text-rose-400/60 text-xs mt-0.5 shrink-0"></i>
+                              <p className="flex-1 font-medium">{item.content}</p>
+                              <i className="fa-solid fa-quote-right text-rose-400/60 text-xs mt-0.5 shrink-0 self-end"></i>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Card Footer Actions */}
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-900 text-xs">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-[10px] px-2 py-0.5 bg-slate-900 text-slate-400 rounded-md border border-slate-800">
+                            {item.questionType || '지문 학습 성찰'}
+                          </span>
+                          {item.metacognitiveStatus && (
+                            <span className="text-[10px] text-slate-400 font-semibold">
+                              {item.metacognitiveStatus}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center space-x-1.5">
+                          {reflectionStudentFilter === 'all' && (
+                            <button
+                              onClick={() => setReflectionStudentFilter(item.studentEmail)}
+                              className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-rose-300 text-[11px] font-semibold rounded-lg border border-slate-800 transition-all flex items-center space-x-1"
+                              title="이 학생의 소감만 보기"
+                            >
+                              <i className="fa-solid fa-filter text-[10px]"></i>
+                              <span>이 학생만</span>
+                            </button>
+                          )}
+                          {studentObj && (
+                            <button
+                              onClick={() => handleGenerateStudentReport(studentObj)}
+                              className="px-2.5 py-1 bg-purple-600/80 hover:bg-purple-600 text-white text-[11px] font-bold rounded-lg shadow-sm transition-all flex items-center space-x-1"
+                              title="이 학생의 학습 실적으로 AI 세특 생성"
+                            >
+                              <i className="fa-solid fa-wand-magic-sparkles text-[10px] text-cyan-300"></i>
+                              <span>AI 세특</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Detailed Student Analytics & Records Table */}
       {(activeMainTab === 'all' || activeMainTab === 'students') && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
@@ -928,311 +1309,6 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                   })}
                 </tbody>
               </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ✍️ Dedicated Student Reflections (학습 소감 / 댓글) 모아보기 Section */}
-      {(activeMainTab === 'all' || activeMainTab === 'reflections') && (
-        <div id="student-reflections-section" className="bg-slate-900 border border-rose-500/30 rounded-3xl p-6 shadow-2xl space-y-5">
-          {/* Section Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-11 h-11 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center text-xl font-bold shadow-inner">
-                <i className="fa-solid fa-comments"></i>
-              </div>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <h3 className="text-base font-bold text-white tracking-tight">
-                    ✍️ 학생별 지문 학습 소감(댓글) 모아보기
-                  </h3>
-                  <span className="px-2.5 py-0.5 bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-lg font-mono">
-                    총 {allReflectionsOnly.length}건
-                  </span>
-                  {activeMainTab === 'reflections' && (
-                    <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-bold rounded-md">
-                      전용 뷰 모드
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  학생들이 지문 학습 후 직접 작성한 구문 탐구 소감 및 성찰 댓글을 학생별로 필터링하고 최신순으로 확인할 수 있습니다.
-                </p>
-              </div>
-            </div>
-
-            {/* Reflection Top Count Badge */}
-            <div className="flex items-center space-x-2 text-xs">
-              <div className="px-3 py-1.5 bg-slate-950 rounded-xl border border-slate-800 text-slate-300 flex items-center space-x-2">
-                <span className="text-slate-400">현재 표시 소감:</span>
-                <strong className="text-rose-400 font-mono font-bold">{filteredStudentReflections.length}건</strong>
-              </div>
-            </div>
-          </div>
-
-          {/* Filtering & Sorting Controls Bar */}
-          <div className="bg-slate-950/90 border border-slate-800 p-4 rounded-2xl space-y-3">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-              {/* 1) Student Filter Dropdown & Reset */}
-              <div className="flex flex-wrap items-center gap-2 flex-1">
-                <span className="text-xs font-bold text-slate-300 flex items-center space-x-1.5 shrink-0">
-                  <i className="fa-solid fa-user-check text-rose-400"></i>
-                  <span>1) 학생별 필터:</span>
-                </span>
-                <select
-                  value={reflectionStudentFilter}
-                  onChange={(e) => setReflectionStudentFilter(e.target.value)}
-                  className="bg-slate-900 text-slate-200 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:outline-none focus:border-rose-500 font-medium"
-                >
-                  <option value="all">전체 학생 소감 보기 (총 {allReflectionsOnly.length}건)</option>
-                  {students.map((std) => {
-                    const stdCount = allReflectionsOnly.filter(
-                      (r) => r.studentEmail.toLowerCase() === std.email.toLowerCase()
-                    ).length;
-                    return (
-                      <option key={std.id} value={std.email}>
-                        {std.name} ({std.email}) - {stdCount}건
-                      </option>
-                    );
-                  })}
-                </select>
-
-                {reflectionStudentFilter !== 'all' && (
-                  <button
-                    onClick={() => setReflectionStudentFilter('all')}
-                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 text-xs font-semibold rounded-xl transition-all flex items-center space-x-1"
-                  >
-                    <i className="fa-solid fa-xmark"></i>
-                    <span>필터 해제</span>
-                  </button>
-                )}
-              </div>
-
-              {/* 2) Sort Order Toggle (최근 순 / 오래된 순) */}
-              <div className="flex items-center space-x-2 shrink-0">
-                <span className="text-xs font-bold text-slate-300 flex items-center space-x-1">
-                  <i className="fa-solid fa-arrow-down-wide-short text-cyan-400"></i>
-                  <span>2) 정렬:</span>
-                </span>
-                <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
-                  <button
-                    onClick={() => setReflectionSortOrder('latest')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
-                      reflectionSortOrder === 'latest'
-                        ? 'bg-rose-600 text-white shadow'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                    title="최신 작성된 소감부터 내림차순 정렬"
-                  >
-                    <i className="fa-solid fa-clock-rotate-left"></i>
-                    <span>최근 순 (기본)</span>
-                  </button>
-                  <button
-                    onClick={() => setReflectionSortOrder('oldest')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 ${
-                      reflectionSortOrder === 'oldest'
-                        ? 'bg-rose-600 text-white shadow'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                    title="과거 작성된 소감부터 오름차순 정렬"
-                  >
-                    <i className="fa-solid fa-arrow-up-1-9"></i>
-                    <span>오래된 순</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Keyword Search & Quick Student Chips */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-900">
-              <div className="relative flex-1 max-w-md">
-                <input
-                  type="text"
-                  value={reflectionSearch}
-                  onChange={(e) => setReflectionSearch(e.target.value)}
-                  placeholder="소감 내용, 지문명, 학생명 실시간 검색..."
-                  className="w-full bg-slate-900 text-slate-200 text-xs pl-8 pr-8 py-2 rounded-xl border border-slate-800 focus:outline-none focus:border-rose-500"
-                />
-                <i className="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-500"></i>
-                {reflectionSearch && (
-                  <button
-                    onClick={() => setReflectionSearch('')}
-                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200 text-xs"
-                  >
-                    <i className="fa-solid fa-circle-xmark"></i>
-                  </button>
-                )}
-              </div>
-
-              {/* Quick Filter Chips for active students */}
-              <div className="flex flex-wrap items-center gap-1.5 text-[11px] overflow-x-auto py-1">
-                <span className="text-slate-500 shrink-0">빠른 선택:</span>
-                <button
-                  onClick={() => setReflectionStudentFilter('all')}
-                  className={`px-2 py-1 rounded-lg font-bold transition-all ${
-                    reflectionStudentFilter === 'all'
-                      ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50'
-                      : 'bg-slate-900 text-slate-400 hover:text-slate-300 border border-slate-800'
-                  }`}
-                >
-                  전체
-                </button>
-                {students.slice(0, 7).map((std) => {
-                  const count = allReflectionsOnly.filter((r) => r.studentEmail.toLowerCase() === std.email.toLowerCase()).length;
-                  const isSelected = reflectionStudentFilter.toLowerCase() === std.email.toLowerCase();
-                  return (
-                    <button
-                      key={std.id}
-                      onClick={() => setReflectionStudentFilter(std.email)}
-                      className={`px-2 py-1 rounded-lg font-bold transition-all flex items-center space-x-1 shrink-0 ${
-                        isSelected
-                          ? 'bg-rose-600 text-white shadow'
-                          : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                      }`}
-                    >
-                      <span>{std.name}</span>
-                      <span className={`text-[10px] font-mono px-1 rounded ${isSelected ? 'bg-rose-700 text-rose-100' : 'bg-slate-800 text-rose-400'}`}>
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Reflection Cards Feed */}
-          {filteredStudentReflections.length === 0 ? (
-            <div className="py-14 text-center space-y-3 bg-slate-950/60 rounded-2xl border border-slate-800/80">
-              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-400 flex items-center justify-center text-2xl mx-auto border border-rose-500/20">
-                <i className="fa-solid fa-comment-slash"></i>
-              </div>
-              <p className="text-sm font-bold text-slate-300">
-                {reflectionStudentFilter !== 'all' || reflectionSearch
-                  ? '선택한 조건에 해당하는 학생 학습 소감이 없습니다.'
-                  : '아직 수집된 학생 학습 소감 데이터가 없습니다.'}
-              </p>
-              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-                학생들이 지문 학습 화면에서 작성한 구문 분석 소감 및 성찰 댓글이 실시간으로 이곳에 표시됩니다.
-              </p>
-              {(reflectionStudentFilter !== 'all' || reflectionSearch) && (
-                <button
-                  onClick={() => {
-                    setReflectionStudentFilter('all');
-                    setReflectionSearch('');
-                  }}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-rose-300 text-xs font-bold rounded-xl border border-slate-700 transition-all"
-                >
-                  모든 소감 다시 보기
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {filteredStudentReflections.map((item) => {
-                  const studentObj = students.find((s) => s.email.toLowerCase() === item.studentEmail.toLowerCase());
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="bg-slate-950/90 border border-slate-800 hover:border-rose-500/40 rounded-2xl p-4 transition-all hover:shadow-xl hover:shadow-rose-950/10 flex flex-col justify-between space-y-3"
-                    >
-                      {/* Card Header: Student & Time */}
-                      <div>
-                        <div className="flex items-center justify-between gap-2 border-b border-slate-900 pb-2.5">
-                          <div className="flex items-center space-x-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 to-pink-500 text-white flex items-center justify-center font-bold text-xs shadow-sm">
-                              {item.studentName.slice(0, 1)}
-                            </div>
-                            <div>
-                              <div className="flex items-center space-x-2">
-                                <button
-                                  onClick={() => setReflectionStudentFilter(item.studentEmail)}
-                                  className="text-xs font-bold text-white hover:text-rose-300 transition-colors cursor-pointer text-left"
-                                  title="이 학생의 소감만 필터링"
-                                >
-                                  {item.studentName}
-                                </button>
-                                <span className="text-[10px] text-slate-500 font-mono">
-                                  {item.studentEmail}
-                                </span>
-                              </div>
-                              <div className="text-[11px] text-slate-400 font-medium truncate max-w-[240px]">
-                                {item.lesson && <span className="text-purple-400 font-bold mr-1">[{item.lesson}]</span>}
-                                {item.itemNo && <span className="text-cyan-400 mr-1">{item.itemNo}</span>}
-                                <span>{item.passageTitle}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Relative & Absolute Timestamp */}
-                          <div className="text-right shrink-0">
-                            <span
-                              className="px-2 py-0.5 bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[10px] font-bold rounded-md"
-                              title={item.formattedDate}
-                            >
-                              {item.relativeTime}
-                            </span>
-                            <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                              {item.formattedDate.slice(0, 16)}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Card Body: Student's Actual Reflection / Comment */}
-                        <div className="mt-3 relative">
-                          <div className="p-3.5 bg-slate-900/90 rounded-xl border border-slate-800 text-slate-100 text-xs leading-relaxed font-sans whitespace-pre-wrap selection:bg-rose-500 selection:text-white shadow-inner">
-                            <div className="flex items-start space-x-2">
-                              <i className="fa-solid fa-quote-left text-rose-400/60 text-xs mt-0.5 shrink-0"></i>
-                              <p className="flex-1 font-medium">{item.content}</p>
-                              <i className="fa-solid fa-quote-right text-rose-400/60 text-xs mt-0.5 shrink-0 self-end"></i>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Card Footer Actions */}
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-900 text-xs">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-[10px] px-2 py-0.5 bg-slate-900 text-slate-400 rounded-md border border-slate-800">
-                            {item.questionType || '지문 학습 성찰'}
-                          </span>
-                          {item.metacognitiveStatus && (
-                            <span className="text-[10px] text-slate-400 font-semibold">
-                              {item.metacognitiveStatus}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center space-x-1.5">
-                          {reflectionStudentFilter === 'all' && (
-                            <button
-                              onClick={() => setReflectionStudentFilter(item.studentEmail)}
-                              className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-rose-300 text-[11px] font-semibold rounded-lg border border-slate-800 transition-all flex items-center space-x-1"
-                              title="이 학생의 소감만 보기"
-                            >
-                              <i className="fa-solid fa-filter text-[10px]"></i>
-                              <span>이 학생만</span>
-                            </button>
-                          )}
-                          {studentObj && (
-                            <button
-                              onClick={() => handleGenerateStudentReport(studentObj)}
-                              className="px-2.5 py-1 bg-purple-600/80 hover:bg-purple-600 text-white text-[11px] font-bold rounded-lg shadow-sm transition-all flex items-center space-x-1"
-                              title="이 학생의 학습 실적으로 AI 세특 생성"
-                            >
-                              <i className="fa-solid fa-wand-magic-sparkles text-[10px] text-cyan-300"></i>
-                              <span>AI 세특</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             </div>
           )}
         </div>

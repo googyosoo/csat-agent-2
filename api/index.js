@@ -78,44 +78,69 @@ var globalLearningEvents = initialStore.learningEvents;
 var globalTransformedQuestions = initialStore.transformedQuestions || [];
 app.post("/api/analytics/sync", (req, res) => {
   try {
-    const { student, socraticLog, learningEvent } = req.body || {};
-    if (student && student.email) {
-      const emailKey = student.email.toLowerCase().trim();
-      const existing = globalStudentsMap.get(emailKey);
-      if (existing) {
-        globalStudentsMap.set(emailKey, {
-          ...existing,
-          ...student,
-          loginCount: Math.max(existing.loginCount || 1, student.loginCount || 1),
-          totalDwellTimeMinutes: Math.max(existing.totalDwellTimeMinutes || 0, student.totalDwellTimeMinutes || 0),
-          completedPassagesCount: Math.max(existing.completedPassagesCount || 0, student.completedPassagesCount || 0),
-          transformedQuestionsGenerated: Math.max(existing.transformedQuestionsGenerated || 0, student.transformedQuestionsGenerated || 0),
-          socraticQuestionsCount: Math.max(existing.socraticQuestionsCount || 0, student.socraticQuestionsCount || 0),
-          status: "online",
-          lastLogin: student.lastLogin || existing.lastLogin
-        });
-      } else {
-        globalStudentsMap.set(emailKey, { ...student, status: "online" });
+    const { student, students: bulkStudents, socraticLog, socraticLogs: bulkSocraticLogs, learningEvent, learningEvents: bulkLearningEvents } = req.body || {};
+    const processStudent = (std) => {
+      if (std && std.email) {
+        const emailKey = std.email.toLowerCase().trim();
+        const existing = globalStudentsMap.get(emailKey);
+        if (existing) {
+          globalStudentsMap.set(emailKey, {
+            ...existing,
+            ...std,
+            loginCount: Math.max(existing.loginCount || 1, std.loginCount || 1),
+            totalDwellTimeMinutes: Math.max(existing.totalDwellTimeMinutes || 0, std.totalDwellTimeMinutes || 0),
+            completedPassagesCount: Math.max(existing.completedPassagesCount || 0, std.completedPassagesCount || 0),
+            transformedQuestionsGenerated: Math.max(existing.transformedQuestionsGenerated || 0, std.transformedQuestionsGenerated || 0),
+            socraticQuestionsCount: Math.max(existing.socraticQuestionsCount || 0, std.socraticQuestionsCount || 0),
+            status: "online",
+            lastLogin: std.lastLogin || existing.lastLogin
+          });
+        } else {
+          globalStudentsMap.set(emailKey, { ...std, status: "online" });
+        }
       }
-    }
-    if (socraticLog && socraticLog.id) {
-      if (!globalSocraticLogs.some((l) => l.id === socraticLog.id)) {
-        globalSocraticLogs.unshift(socraticLog);
+    };
+    if (student) processStudent(student);
+    if (Array.isArray(bulkStudents)) bulkStudents.forEach(processStudent);
+    const logsToAdd = [];
+    if (socraticLog) logsToAdd.push(socraticLog);
+    if (Array.isArray(bulkSocraticLogs)) logsToAdd.push(...bulkSocraticLogs);
+    logsToAdd.forEach((log) => {
+      if (log) {
+        const logId = log.id || `soc-sync-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        log.id = logId;
+        const exists = globalSocraticLogs.some((l) => l.id === logId || l.timestamp === log.timestamp && l.studentEmail === log.studentEmail);
+        if (!exists) {
+          globalSocraticLogs.unshift(log);
+        }
       }
-    }
-    if (learningEvent && learningEvent.id) {
-      if (!globalLearningEvents.some((e) => e.id === learningEvent.id)) {
-        globalLearningEvents.unshift(learningEvent);
+    });
+    const eventsToAdd = [];
+    if (learningEvent) eventsToAdd.push(learningEvent);
+    if (Array.isArray(bulkLearningEvents)) eventsToAdd.push(...bulkLearningEvents);
+    eventsToAdd.forEach((ev) => {
+      if (ev) {
+        const evId = ev.id || `evt-sync-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        ev.id = evId;
+        const exists = globalLearningEvents.some((e) => e.id === evId);
+        if (!exists) {
+          globalLearningEvents.unshift(ev);
+        }
       }
-    }
+    });
     const studentsArr = Array.from(globalStudentsMap.values());
     saveAnalyticsToFile({
       students: studentsArr,
-      socraticLogs: globalSocraticLogs.slice(0, 300),
-      learningEvents: globalLearningEvents.slice(0, 500),
+      socraticLogs: globalSocraticLogs.slice(0, 1e3),
+      learningEvents: globalLearningEvents.slice(0, 1e3),
       transformedQuestions: globalTransformedQuestions
     });
-    return res.json({ success: true, count: globalStudentsMap.size, students: studentsArr });
+    return res.json({
+      success: true,
+      count: globalStudentsMap.size,
+      socraticCount: globalSocraticLogs.length,
+      students: studentsArr
+    });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
