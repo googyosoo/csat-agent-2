@@ -18,6 +18,8 @@ export interface StudentActivity {
   quizAccuracyPercentage: number;
   socraticQuestionsCount: number;
   status: 'online' | 'offline';
+  socraticLogs?: SocraticSummary[];
+  learningEvents?: LearningEvent[];
 }
 
 export interface SocraticSummary {
@@ -44,6 +46,59 @@ export interface AnalyticsMetrics {
 
 const STORAGE_KEY_STUDENTS = 'csat_analytics_students_v1';
 const STORAGE_KEY_SOCRATIC = 'csat_analytics_socratic_v1';
+
+/**
+ * Deterministic Korean Date Parser that parses:
+ * - "2026. 09. 14. 오후 06:35:12" / "2026. 9. 14. 오전 8:30"
+ * - ISO string: "2026-09-14T09:35:12.000Z"
+ * - Numeric timestamp or ID fallback
+ */
+export function parseToTimestamp(str: string | number | undefined): number {
+  if (!str) return 0;
+  if (typeof str === 'number') return str;
+  const direct = Date.parse(str);
+  if (!isNaN(direct)) return direct;
+
+  const match = str.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?\s*(오전|오후)?\s*(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const day = parseInt(match[3], 10);
+    const isPm = match[4] === '오후';
+    let hour = parseInt(match[5], 10);
+    const min = parseInt(match[6], 10);
+    const sec = match[7] ? parseInt(match[7], 10) : 0;
+    if (isPm && hour < 12) hour += 12;
+    if (!isPm && match[4] === '오전' && hour === 12) hour = 0;
+    return new Date(year, month, day, hour, min, sec).getTime();
+  }
+
+  const idMatch = str.match(/(?:soc|evt)-(\d{12,14})/);
+  if (idMatch) {
+    return parseInt(idMatch[1], 10);
+  }
+
+  return 0;
+}
+
+export function formatRelativeTime(ts: number): string {
+  if (!ts) return '최근';
+  const diffSec = Math.floor((Date.now() - ts) / 1000);
+  if (diffSec < 10) return '방금 전';
+  if (diffSec < 60) return `${diffSec}초 전`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours}시간 전`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}일 전`;
+  return new Date(ts).toLocaleString('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 /**
  * Global Custom Event Dispatcher for 0ms Instant UI Reactivity
@@ -87,14 +142,14 @@ let firestoreCache: {
   lastFetched: 0,
 };
 
-async function fetchFirestoreWithTimeout(timeoutMs = 1200): Promise<{
+async function fetchFirestoreWithTimeout(timeoutMs = 3500): Promise<{
   students: StudentActivity[];
   socraticLogs: SocraticSummary[];
   learningEvents: LearningEvent[];
 }> {
   const now = Date.now();
-  // Use cached Firestore data if fetched within last 10 seconds to avoid API latency
-  if (now - firestoreCache.lastFetched < 10000 && firestoreCache.students.length > 0) {
+  // Use cached Firestore data if fetched within last 5 seconds to avoid API latency
+  if (now - firestoreCache.lastFetched < 5000 && firestoreCache.students.length > 0) {
     return firestoreCache;
   }
 
@@ -110,7 +165,17 @@ async function fetchFirestoreWithTimeout(timeoutMs = 1200): Promise<{
     ]);
 
     if (stdSnap.status === 'fulfilled' && !stdSnap.value.empty) {
-      stdSnap.value.forEach((d) => students.push(d.data() as StudentActivity));
+      stdSnap.value.forEach((d) => {
+        const sData = d.data() as StudentActivity;
+        students.push(sData);
+        // Also extract any student-nested logs
+        if (sData.socraticLogs && Array.isArray(sData.socraticLogs)) {
+          sData.socraticLogs.forEach((l) => socraticLogs.push(l));
+        }
+        if (sData.learningEvents && Array.isArray(sData.learningEvents)) {
+          sData.learningEvents.forEach((e) => learningEvents.push(e));
+        }
+      });
     }
     if (socSnap.status === 'fulfilled' && !socSnap.value.empty) {
       socSnap.value.forEach((d) => socraticLogs.push(d.data() as SocraticSummary));
@@ -121,6 +186,7 @@ async function fetchFirestoreWithTimeout(timeoutMs = 1200): Promise<{
 
     const result = { students, socraticLogs, learningEvents, lastFetched: Date.now() };
     firestoreCache = result;
+    notifyAnalyticsUpdated();
     return result;
   })();
 
@@ -137,7 +203,7 @@ async function fetchFirestoreWithTimeout(timeoutMs = 1200): Promise<{
  * Ultra-Fast Multi-Source Data Aggregator:
  * 1. LocalStorage (0ms immediate state)
  * 2. High-speed In-Memory Backend API (10~20ms)
- * 3. Non-blocking Firestore Background Sync
+ * 3. Non-blocking Firestore Background Sync with Student-Nested Log Extraction
  */
 export async function fetchServerAnalyticsData(): Promise<{
   students: StudentActivity[];
@@ -163,8 +229,8 @@ export async function fetchServerAnalyticsData(): Promise<{
     } catch (e) {}
   })();
 
-  // 2. Parallel Non-blocking Firestore Sync
-  const firestorePromise = fetchFirestoreWithTimeout(800);
+  // 2. Parallel Firestore Sync (with 3500ms guard)
+  const firestorePromise = fetchFirestoreWithTimeout(3500);
 
   await Promise.allSettled([backendPromise, firestorePromise]);
 
@@ -184,6 +250,10 @@ export async function fetchServerAnalyticsData(): Promise<{
     if (!existing) {
       studentMap.set(key, s);
     } else {
+      // Merge socraticLogs and learningEvents
+      const mergedSoc = [...(existing.socraticLogs || []), ...(s.socraticLogs || [])];
+      const mergedEvt = [...(existing.learningEvents || []), ...(s.learningEvents || [])];
+
       studentMap.set(key, {
         ...existing,
         ...s,
@@ -193,6 +263,8 @@ export async function fetchServerAnalyticsData(): Promise<{
         transformedQuestionsGenerated: Math.max(existing.transformedQuestionsGenerated || 0, s.transformedQuestionsGenerated || 0),
         socraticQuestionsCount: Math.max(existing.socraticQuestionsCount || 0, s.socraticQuestionsCount || 0),
         status: s.status === 'online' || existing.status === 'online' ? 'online' : 'offline',
+        socraticLogs: mergedSoc,
+        learningEvents: mergedEvt,
       });
     }
   };
@@ -214,6 +286,24 @@ export async function fetchServerAnalyticsData(): Promise<{
   [...firestoreEvents, ...localEvents, ...serverLearningEvents].forEach((ev) => {
     if (ev && ev.id) {
       eventMap.set(ev.id, ev);
+    }
+  });
+
+  // CRITICAL: Extract and merge student-nested logs from all student documents
+  Array.from(studentMap.values()).forEach((std) => {
+    if (std.socraticLogs && Array.isArray(std.socraticLogs)) {
+      std.socraticLogs.forEach((soc) => {
+        if (soc && soc.id) {
+          socMap.set(soc.id, soc);
+        }
+      });
+    }
+    if (std.learningEvents && Array.isArray(std.learningEvents)) {
+      std.learningEvents.forEach((ev) => {
+        if (ev && ev.id) {
+          eventMap.set(ev.id, ev);
+        }
+      });
     }
   });
 
@@ -429,12 +519,25 @@ export async function recordSocraticQuestion(data: {
     setDoc(doc(db, 'learningEvents', newLearningEvent.id), newLearningEvent).catch(() => {});
   } catch (e) {}
 
-  // Automatically update student activity count
+  // Automatically update student activity count and embed socratic logs directly in student record
   const { students, idx } = ensureStudentRecord(email, name);
   students[idx].socraticQuestionsCount += 1;
   students[idx].completedPassagesCount = Math.max(students[idx].completedPassagesCount || 0, 1);
   students[idx].totalDwellTimeMinutes += 2;
   students[idx].lastLogin = nowStr;
+
+  // Embed directly in student object so it syncs with students collection
+  if (!students[idx].socraticLogs) students[idx].socraticLogs = [];
+  if (!students[idx].socraticLogs.some((l) => l.id === newLog.id)) {
+    students[idx].socraticLogs.unshift(newLog);
+    students[idx].socraticLogs = students[idx].socraticLogs.slice(0, 50);
+  }
+
+  if (!students[idx].learningEvents) students[idx].learningEvents = [];
+  if (!students[idx].learningEvents.some((e) => e.id === newLearningEvent.id)) {
+    students[idx].learningEvents.unshift(newLearningEvent);
+    students[idx].learningEvents = students[idx].learningEvents.slice(0, 100);
+  }
 
   try {
     localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
@@ -546,6 +649,18 @@ export async function recordLearningEvent(event: Omit<LearningEvent, 'id' | 'tim
     const docId = `${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     setDoc(doc(db, 'learningEvents', docId), newEvent, { merge: true }).catch(() => {});
     syncAnalyticsToServer({ learningEvent: newEvent });
+
+    if (event.studentEmail) {
+      const { students, idx } = ensureStudentRecord(event.studentEmail, event.studentName);
+      if (!students[idx].learningEvents) students[idx].learningEvents = [];
+      if (!students[idx].learningEvents.some((e) => e.id === newEvent.id)) {
+        students[idx].learningEvents.unshift(newEvent);
+        students[idx].learningEvents = students[idx].learningEvents.slice(0, 100);
+      }
+      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
+      const sDocId = event.studentEmail.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
+      setDoc(doc(db, 'students', sDocId), students[idx], { merge: true }).catch(() => {});
+    }
   } catch (e) {}
 
   return events;
