@@ -2174,18 +2174,6 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                           {record.questionType}
                         </span>
 
-                        {record.isCorrect !== undefined && (
-                          <span
-                            className={`px-2 py-0.5 rounded-lg font-bold ${
-                              record.isCorrect
-                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                            }`}
-                          >
-                            {record.isCorrect ? '⭕ 정답' : '❌ 오답'}
-                          </span>
-                        )}
-
                         {record.metacognitiveStatus && (
                           <span className="text-[10px] text-slate-400 font-semibold hidden sm:inline-block">
                             {record.metacognitiveStatus}
@@ -2210,7 +2198,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                       <span className="text-[10px] text-slate-500">
                         {record.sourceType === 'reflection'
                           ? '지문 심층 분석 & 메타인지 성찰 기록'
-                          : '수능 유형별 변형 문제 풀이 및 논리적 근거'}
+                          : '수능 유형별 변형 문제 풀이 및 사고 근거'}
                       </span>
 
                       {matchedStudent && (
@@ -2245,8 +2233,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                     <th className="p-2.5">일시 (최신순)</th>
                     <th className="p-2.5">작성 학생</th>
                     <th className="p-2.5">대상 지문</th>
-                    <th className="p-2.5">유형</th>
-                    <th className="p-2.5">정답 여부</th>
+                    <th className="p-2.5">학습 유형</th>
                     <th className="p-2.5">학생 작성 본문 (소감 / 사고 근거)</th>
                     <th className="p-2.5 text-right">학생 기록</th>
                   </tr>
@@ -2280,17 +2267,6 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                           >
                             {record.questionType}
                           </span>
-                        </td>
-                        <td className="p-2.5 whitespace-nowrap">
-                          {record.isCorrect !== undefined ? (
-                            record.isCorrect ? (
-                              <span className="text-emerald-400 font-bold">⭕ 정답</span>
-                            ) : (
-                              <span className="text-rose-400 font-bold">❌ 오답</span>
-                            )
-                          ) : (
-                            <span className="text-slate-500">-</span>
-                          )}
                         </td>
                         <td className="p-2.5 text-slate-200 font-serif max-w-sm">
                           <div className="line-clamp-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800/80 text-[11px]">
