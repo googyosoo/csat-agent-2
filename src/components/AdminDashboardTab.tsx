@@ -42,12 +42,28 @@ export interface UnifiedActivityRecord {
   itemNo: string;
   questionType: string;
   isCorrect?: boolean;
+  selectedIndex?: number;
+  correctIndex?: number;
   content: string;
   metacognitiveStatus?: string;
   rawTimestamp: number;
   formattedDate: string;
   relativeTime: string;
 }
+
+export const isAutoQuizPlaceholder = (text?: string | null): boolean => {
+  if (!text) return true;
+  const t = text.trim();
+  return (
+    !t ||
+    t === '오답 선택' ||
+    t === '정답 선택' ||
+    t === '정답을 올바르게 도출함' ||
+    t === '오답 선택 후 오답 원인 분석' ||
+    t === '지문 구문 및 어휘 탐구 소감 작성' ||
+    t === '지문 구문 분석 및 핵심 어휘 학습 소감'
+  );
+};
 
 export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }) => {
   const [students, setStudents] = useState<StudentActivity[]>([]);
@@ -61,8 +77,14 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   const [reflectionSortOrder, setReflectionSortOrder] = useState<'latest' | 'oldest'>('latest');
   const [reflectionSearch, setReflectionSearch] = useState<string>('');
 
-  // View Navigation Tab ('all': 통합 전체 뷰, 'students': 학생별 학습 현황 및 기록, 'reflections': 학생별 소감 피드, 'feed': 실시간 최신순 기록 스트림)
-  const [activeMainTab, setActiveMainTab] = useState<'all' | 'students' | 'reflections' | 'feed'>('all');
+  // Dedicated Student Quiz (정답/오답) Viewer Filter & Sort State
+  const [quizStudentFilter, setQuizStudentFilter] = useState<string>('all');
+  const [quizStatusFilter, setQuizStatusFilter] = useState<'all' | 'correct' | 'incorrect'>('all');
+  const [quizSearch, setQuizSearch] = useState<string>('');
+  const [studentAccordionTab, setStudentAccordionTab] = useState<Record<string, 'quiz' | 'reflection'>>({});
+
+  // View Navigation Tab ('all': 통합 전체 뷰, 'students': 학생별 학습 현황 및 기록, 'reflections': 학생별 소감 모아보기, 'quizzes': 학생별 문제 풀이 & 정답 현황, 'feed': 실시간 소감 스트림)
+  const [activeMainTab, setActiveMainTab] = useState<'all' | 'students' | 'reflections' | 'quizzes' | 'feed'>('all');
 
   // Student-specific records modal state
   const [selectedStudentForRecords, setSelectedStudentForRecords] = useState<StudentActivity | null>(null);
@@ -72,7 +94,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   // Accordion expanded students in table
   const [expandedStudentIds, setExpandedStudentIds] = useState<string[]>([]);
 
-  // Latest Activity Feed Controls
+  // Latest Activity Feed Controls (지문 학습 성찰 소감 실시간 스트림)
   const [feedFilter, setFeedFilter] = useState<'all' | 'reflection' | 'quiz'>('all');
   const [feedStudentFilter, setFeedStudentFilter] = useState<string>('all');
   const [feedSearchTerm, setFeedSearchTerm] = useState('');
@@ -361,13 +383,12 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
       if (!ev) return;
       const evEmail = (ev.studentEmail || (ev as any).email || 'guest_student@simin.hs.kr').trim();
       const ts = parseToTimestamp(ev.timestamp) || (ev.id ? parseToTimestamp(ev.id) : 0);
-      const isReflection = ev.questionType === '지문 학습 소감 & 세특' || (!ev.questionType && !ev.isCorrect && !!ev.reasonText);
-      const content = (ev.reasonText || (ev as any).content || '').trim();
+      const rawText = (ev.reasonText || (ev as any).content || '').trim();
+      const isQuizEvent = ev.isCorrect !== undefined || ev.selectedIndex !== undefined || isAutoQuizPlaceholder(rawText) || (ev.questionType && ev.questionType !== '지문 학습 소감 & 세특');
 
-      if (isReflection) {
-        if (content) {
-          reflectionKeySet.add(`${evEmail.toLowerCase()}_${content.slice(0, 30)}`);
-        }
+      if (!isQuizEvent && ev.questionType === '지문 학습 소감 & 세특' && rawText && !isAutoQuizPlaceholder(rawText)) {
+        // Genuine student reflection
+        reflectionKeySet.add(`${evEmail.toLowerCase()}_${rawText.slice(0, 30)}`);
         records.push({
           id: ev.id || `evt-ref-${Math.random().toString(36).substring(2, 6)}`,
           sourceType: 'reflection',
@@ -377,12 +398,13 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
           lesson: ev.lesson || '',
           itemNo: ev.itemNo || '',
           questionType: '지문 학습 성찰/소감',
-          content: content || '지문 구문 및 어휘 탐구 소감 작성',
+          content: rawText,
           rawTimestamp: ts,
           formattedDate: ts ? new Date(ts).toLocaleString('ko-KR') : (ev.timestamp || '최근'),
           relativeTime: formatRelativeTime(ts),
         });
       } else {
+        // Quiz answering event (정답/오답)
         records.push({
           id: ev.id || `evt-quiz-${Math.random().toString(36).substring(2, 6)}`,
           sourceType: 'quiz',
@@ -393,7 +415,11 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
           itemNo: ev.itemNo || '',
           questionType: ev.questionType || '변형문제 풀이',
           isCorrect: ev.isCorrect,
-          content: content || (ev.isCorrect ? '정답을 올바르게 도출함' : '오답 선택 후 오답 원인 분석'),
+          selectedIndex: ev.selectedIndex,
+          correctIndex: ev.correctIndex,
+          content: rawText && !isAutoQuizPlaceholder(rawText)
+            ? rawText
+            : (ev.isCorrect ? '정답을 올바르게 도출함' : '오답 선택 후 오답 원인 분석'),
           rawTimestamp: ts,
           formattedDate: ts ? new Date(ts).toLocaleString('ko-KR') : (ev.timestamp || '최근'),
           relativeTime: formatRelativeTime(ts),
@@ -401,7 +427,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
       }
     });
 
-    // 2. Process socSummaries
+    // 2. Process socSummaries (student reflection logs)
     socSummaries.forEach((soc) => {
       if (!soc) return;
       const email = (soc.studentEmail || (soc as any).email || 'guest_student@simin.hs.kr').trim();
@@ -414,11 +440,14 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         ''
       ).trim();
 
+      // Exclude placeholder answer texts from being counted as reflection
+      if (!text || isAutoQuizPlaceholder(text)) return;
+
       const dedupKey = `${email.toLowerCase()}_${text.slice(0, 30)}`;
-      if (text && reflectionKeySet.has(dedupKey)) {
+      if (reflectionKeySet.has(dedupKey)) {
         return; // Already added
       }
-      if (text) reflectionKeySet.add(dedupKey);
+      reflectionKeySet.add(dedupKey);
 
       const ts = parseToTimestamp(soc.timestamp) || (soc.id ? parseToTimestamp(soc.id) : 0);
       records.push({
@@ -430,7 +459,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         lesson: soc.lesson || '',
         itemNo: soc.itemNo || '',
         questionType: '지문 학습 성찰/소감',
-        content: text || '지문 구문 분석 및 핵심 어휘 학습 소감',
+        content: text,
         metacognitiveStatus: soc.metacognitiveStatus,
         rawTimestamp: ts,
         formattedDate: soc.timestamp || (ts ? new Date(ts).toLocaleString('ko-KR') : '최근'),
@@ -453,9 +482,11 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
             (soc as any).reasonText ||
             ''
           ).trim();
+          if (!text || isAutoQuizPlaceholder(text)) return;
+
           const dedupKey = `${stdEmail.toLowerCase()}_${text.slice(0, 30)}`;
-          if (text && reflectionKeySet.has(dedupKey)) return;
-          if (text) reflectionKeySet.add(dedupKey);
+          if (reflectionKeySet.has(dedupKey)) return;
+          reflectionKeySet.add(dedupKey);
 
           const ts = parseToTimestamp(soc.timestamp) || (soc.id ? parseToTimestamp(soc.id) : 0);
           records.push({
@@ -467,7 +498,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
             lesson: soc.lesson || '',
             itemNo: soc.itemNo || '',
             questionType: '지문 학습 성찰/소감',
-            content: text || '지문 구문 분석 및 핵심 어휘 학습 소감',
+            content: text,
             metacognitiveStatus: soc.metacognitiveStatus,
             rawTimestamp: ts,
             formattedDate: soc.timestamp || (ts ? new Date(ts).toLocaleString('ko-KR') : '최근'),
@@ -479,6 +510,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         std.learningEvents.forEach((ev) => {
           if (!ev || records.some((r) => r.id === ev.id)) return;
           const ts = parseToTimestamp(ev.timestamp) || (ev.id ? parseToTimestamp(ev.id) : 0);
+          const rawText = (ev.reasonText || (ev as any).content || '').trim();
           records.push({
             id: ev.id || `evt-std-${Math.random().toString(36).substring(2, 6)}`,
             sourceType: 'quiz',
@@ -489,7 +521,11 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
             itemNo: ev.itemNo || '',
             questionType: ev.questionType || '변형문제 풀이',
             isCorrect: ev.isCorrect,
-            content: ev.reasonText || (ev.isCorrect ? '정답을 올바르게 도출함' : '오답 선택 후 오답 원인 분석'),
+            selectedIndex: ev.selectedIndex,
+            correctIndex: ev.correctIndex,
+            content: rawText && !isAutoQuizPlaceholder(rawText)
+              ? rawText
+              : (ev.isCorrect ? '정답을 올바르게 도출함' : '오답 선택 후 오답 원인 분석'),
             rawTimestamp: ts,
             formattedDate: ts ? new Date(ts).toLocaleString('ko-KR') : (ev.timestamp || '최근'),
             relativeTime: formatRelativeTime(ts),
@@ -502,14 +538,18 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
     return records.sort((a, b) => b.rawTimestamp - a.rawTimestamp);
   }, [learningEvents, socSummaries, students]);
 
-  // All reflection logs and study comments (학습 소감 / 학생 사고기록 / 댓글 전수 포함)
+  // All reflection logs and study comments (오직 순수 지문 학습 성찰 소감만 필터링)
   const allReflectionsOnly = React.useMemo(() => {
     return allUnifiedRecords.filter((r) => {
-      if (r.sourceType === 'reflection') return true;
-      // Also include any record with written student thought/reason
-      if (r.content && r.content.trim().length > 3 && !r.content.includes('정답을 올바르게 도출함')) return true;
-      return false;
+      if (r.sourceType !== 'reflection') return false;
+      if (isAutoQuizPlaceholder(r.content)) return false;
+      return r.content && r.content.trim().length > 0;
     });
+  }, [allUnifiedRecords]);
+
+  // All quiz & answer records (위쪽 항목에서 따로 보여줄 문제 풀이 및 정답/오답 데이터)
+  const allQuizRecordsOnly = React.useMemo(() => {
+    return allUnifiedRecords.filter((r) => r.sourceType === 'quiz' || r.isCorrect !== undefined);
   }, [allUnifiedRecords]);
 
   // Unique students who have written reflections (plus all registered students)
@@ -618,12 +658,8 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
     });
   };
 
-  // Filtered latest activity stream records
-  const filteredFeedRecords = allUnifiedRecords.filter((record) => {
-    // Category filter
-    if (feedFilter === 'reflection' && record.sourceType !== 'reflection') return false;
-    if (feedFilter === 'quiz' && record.sourceType !== 'quiz') return false;
-
+  // Filtered latest activity stream records (오직 순수 지문 학습 성찰 소감만 표시)
+  const filteredFeedRecords = allReflectionsOnly.filter((record) => {
     // Student filter
     if (feedStudentFilter !== 'all' && record.studentEmail.toLowerCase() !== feedStudentFilter.toLowerCase()) {
       return false;
@@ -645,6 +681,47 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
     return true;
   });
+
+  // Filtered student quiz answers for upper dedicated section (정답 및 문제 풀이 현황)
+  const filteredQuizRecords = React.useMemo(() => {
+    let list = allQuizRecordsOnly;
+
+    // Student filter
+    if (quizStudentFilter !== 'all') {
+      const filterKey = quizStudentFilter.toLowerCase().trim();
+      list = list.filter((r) => {
+        const rEmail = (r.studentEmail || '').toLowerCase().trim();
+        const rName = (r.studentName || '').toLowerCase().trim();
+        if (rEmail === filterKey) return true;
+        if (filterKey.includes('@') && rEmail.includes('@') && filterKey.split('@')[0] === rEmail.split('@')[0]) return true;
+        if (rName && rName === filterKey) return true;
+        return false;
+      });
+    }
+
+    // Status filter (all, correct, incorrect)
+    if (quizStatusFilter === 'correct') {
+      list = list.filter((r) => r.isCorrect === true);
+    } else if (quizStatusFilter === 'incorrect') {
+      list = list.filter((r) => r.isCorrect === false);
+    }
+
+    // Search term
+    if (quizSearch.trim()) {
+      const term = quizSearch.toLowerCase();
+      list = list.filter(
+        (r) =>
+          r.studentName.toLowerCase().includes(term) ||
+          r.studentEmail.toLowerCase().includes(term) ||
+          (r.passageTitle || '').toLowerCase().includes(term) ||
+          (r.lesson || '').toLowerCase().includes(term) ||
+          (r.questionType || '').toLowerCase().includes(term) ||
+          r.content.toLowerCase().includes(term)
+      );
+    }
+
+    return [...list].sort((a, b) => b.rawTimestamp - a.rawTimestamp);
+  }, [allQuizRecordsOnly, quizStudentFilter, quizStatusFilter, quizSearch]);
 
   if (!hasAccess) {
     return (
@@ -798,6 +875,21 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
           </button>
 
           <button
+            onClick={() => setActiveMainTab('quizzes')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 ${
+              activeMainTab === 'quizzes'
+                ? 'bg-cyan-600 text-white shadow-md shadow-cyan-950/50 ring-2 ring-cyan-400/40'
+                : 'bg-slate-950/60 text-cyan-300 hover:text-white hover:bg-slate-800 border border-cyan-500/30'
+            }`}
+          >
+            <i className="fa-solid fa-square-check text-cyan-400"></i>
+            <span>🎯 학생별 문제 풀이 & 정답 현황</span>
+            <span className="px-1.5 py-0.2 bg-cyan-500/20 text-cyan-300 rounded text-[10px] font-mono font-bold">
+              {allQuizRecordsOnly.length}건
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveMainTab('feed')}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-2 ${
               activeMainTab === 'feed'
@@ -805,10 +897,10 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                 : 'bg-slate-950/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
             }`}
           >
-            <i className="fa-solid fa-bolt text-cyan-400"></i>
-            <span>실시간 최신순 기록 스트림</span>
-            <span className="px-1.5 py-0.2 bg-cyan-500/20 text-cyan-300 rounded text-[10px] font-mono font-bold">
-              {allUnifiedRecords.length}건
+            <i className="fa-solid fa-pen-fancy text-purple-400"></i>
+            <span>실시간 소감 스트림</span>
+            <span className="px-1.5 py-0.2 bg-purple-500/20 text-purple-300 rounded text-[10px] font-mono font-bold">
+              {allReflectionsOnly.length}건
             </span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
           </button>
@@ -816,7 +908,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
         <div className="text-[11px] text-slate-400 pr-2 flex items-center space-x-2">
           <i className="fa-solid fa-circle-info text-cyan-400"></i>
-          <span>학생별 행 클릭 시 작성 소감 및 문제 풀이 즉시 확인 가능</span>
+          <span>위쪽 항목에서 정답/오답 확인 및 지문 학습 성찰 소감 분리 관리</span>
         </div>
       </div>
 
@@ -1205,6 +1297,239 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         </div>
       )}
 
+      {/* 🎯 Dedicated Student Quizzes & Answers (문제 풀이 & 정답 현황) 모아보기 Section (Top Primary Section) */}
+      {(activeMainTab === 'all' || activeMainTab === 'quizzes') && (
+        <div id="student-quizzes-section" className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-2 border-cyan-500/40 rounded-3xl p-6 shadow-2xl shadow-cyan-950/20 space-y-5">
+          {/* Section Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center text-xl font-bold shadow-lg shadow-cyan-950/40">
+                <i className="fa-solid fa-square-check"></i>
+              </div>
+              <div>
+                <div className="flex items-center space-x-2.5">
+                  <h3 className="text-lg font-black text-white tracking-tight flex items-center space-x-2">
+                    <span>🎯 학생별 문제 풀이 & 정답/오답 현황 확인</span>
+                  </h3>
+                  <span className="px-2.5 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-bold rounded-lg font-mono">
+                    총 {allQuizRecordsOnly.length}건 응시
+                  </span>
+                  {allQuizRecordsOnly.length > 0 && (
+                    <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold rounded-lg font-mono">
+                      정답률 {Math.round((allQuizRecordsOnly.filter(r => r.isCorrect).length / Math.max(allQuizRecordsOnly.length, 1)) * 100)}%
+                    </span>
+                  )}
+                  {activeMainTab === 'quizzes' && (
+                    <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold rounded-md">
+                      전용 뷰 모드
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  학생들이 EBS 수능 지문 및 유형별 변형문제를 풀이한 정답/오답 결과와 선택한 답안을 별도 항목에서 집중 모니터링합니다.
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Stats Summary */}
+            <div className="flex items-center gap-2 text-xs">
+              <div className="px-3 py-1.5 bg-slate-950 rounded-xl border border-slate-800 text-slate-300 flex items-center space-x-3">
+                <span className="flex items-center space-x-1 text-emerald-400 font-bold font-mono">
+                  <i className="fa-solid fa-circle-check text-xs"></i>
+                  <span>정답 {allQuizRecordsOnly.filter(r => r.isCorrect).length}건</span>
+                </span>
+                <span className="text-slate-600">|</span>
+                <span className="flex items-center space-x-1 text-rose-400 font-bold font-mono">
+                  <i className="fa-solid fa-circle-xmark text-xs"></i>
+                  <span>오답 {allQuizRecordsOnly.filter(r => !r.isCorrect).length}건</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Filtering Controls Bar */}
+          <div className="bg-slate-950/90 border border-slate-800 p-4 rounded-2xl space-y-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              {/* Student Filter */}
+              <div className="flex flex-wrap items-center gap-2 flex-1">
+                <span className="text-xs font-bold text-slate-300 flex items-center space-x-1.5 shrink-0">
+                  <i className="fa-solid fa-user-check text-cyan-400"></i>
+                  <span>1) 학생 선택:</span>
+                </span>
+                <select
+                  value={quizStudentFilter}
+                  onChange={(e) => setQuizStudentFilter(e.target.value)}
+                  className="bg-slate-900 text-slate-200 text-xs px-3 py-2 rounded-xl border border-slate-700 focus:outline-none focus:border-cyan-500 font-medium"
+                >
+                  <option value="all">전체 학생 문제 풀이 보기 (총 {allQuizRecordsOnly.length}건)</option>
+                  {students.map((std) => {
+                    const cnt = allQuizRecordsOnly.filter(r => r.studentEmail.toLowerCase() === std.email.toLowerCase()).length;
+                    return (
+                      <option key={std.email} value={std.email}>
+                        {std.name} ({std.email}) - {cnt}건 풀이
+                      </option>
+                    );
+                  })}
+                </select>
+
+                {quizStudentFilter !== 'all' && (
+                  <button
+                    onClick={() => setQuizStudentFilter('all')}
+                    className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 text-xs font-semibold rounded-xl transition-all flex items-center space-x-1"
+                  >
+                    <i className="fa-solid fa-xmark"></i>
+                    <span>필터 해제</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Status Filter (전체 / 정답만 / 오답만) */}
+              <div className="flex items-center space-x-2 shrink-0">
+                <span className="text-xs font-bold text-slate-300 flex items-center space-x-1">
+                  <i className="fa-solid fa-filter text-cyan-400"></i>
+                  <span>2) 정오답 필터:</span>
+                </span>
+                <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
+                  <button
+                    onClick={() => setQuizStatusFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      quizStatusFilter === 'all'
+                        ? 'bg-cyan-600 text-white shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    전체 ({allQuizRecordsOnly.length})
+                  </button>
+                  <button
+                    onClick={() => setQuizStatusFilter('correct')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 ${
+                      quizStatusFilter === 'correct'
+                        ? 'bg-emerald-600 text-white shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>⭕ 정답만</span>
+                  </button>
+                  <button
+                    onClick={() => setQuizStatusFilter('incorrect')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1 ${
+                      quizStatusFilter === 'incorrect'
+                        ? 'bg-rose-600 text-white shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <span>❌ 오답만</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Keyword Search */}
+            <div className="relative max-w-md pt-1">
+              <input
+                type="text"
+                value={quizSearch}
+                onChange={(e) => setQuizSearch(e.target.value)}
+                placeholder="지문명, 문제 유형, 학생명 검색..."
+                className="w-full bg-slate-900 text-slate-200 text-xs pl-8 pr-8 py-2 rounded-xl border border-slate-800 focus:outline-none focus:border-cyan-500"
+              />
+              <i className="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-xs text-slate-500"></i>
+              {quizSearch && (
+                <button
+                  onClick={() => setQuizSearch('')}
+                  className="absolute right-2.5 top-3 text-slate-400 hover:text-slate-200 text-xs"
+                >
+                  <i className="fa-solid fa-circle-xmark"></i>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Quiz Records List */}
+          {filteredQuizRecords.length === 0 ? (
+            <div className="py-12 text-center space-y-2 bg-slate-950/60 rounded-2xl border border-slate-800/80">
+              <i className="fa-solid fa-file-circle-check text-3xl text-cyan-500/40"></i>
+              <p className="text-sm font-bold text-slate-300">조건에 부합하는 문제 풀이 및 정답 기록이 없습니다.</p>
+              <p className="text-xs text-slate-500">학생들이 워크북이나 출제 스튜디오에서 문제를 풀면 정답/오답 결과가 이곳에 집계됩니다.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-950 text-slate-400 font-mono border-b border-slate-800">
+                  <tr>
+                    <th className="p-3">풀이 일시</th>
+                    <th className="p-3">풀이 학생</th>
+                    <th className="p-3">대상 지문 및 문항</th>
+                    <th className="p-3">문항 유형</th>
+                    <th className="p-3 text-center">결과</th>
+                    <th className="p-3">답안 확인 (학생 선택 vs 정답)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-sans">
+                  {filteredQuizRecords.slice(0, 30).map((record) => (
+                    <tr key={record.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="p-3 text-slate-400 font-mono text-[11px] whitespace-nowrap">
+                        <span className="font-bold text-slate-300">{record.relativeTime}</span>
+                        <div className="text-[10px] text-slate-500">{record.formattedDate}</div>
+                      </td>
+                      <td className="p-3 text-slate-200 whitespace-nowrap">
+                        <div className="font-bold">{record.studentName}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{record.studentEmail}</div>
+                      </td>
+                      <td className="p-3 text-slate-300 font-medium max-w-xs">
+                        <div className="text-purple-300 font-mono text-[11px]">{record.lesson} {record.itemNo}</div>
+                        <div className="truncate text-xs font-bold text-white">{record.passageTitle}</div>
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        <span className="px-2.5 py-1 bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 rounded-lg text-xs font-bold">
+                          {record.questionType || '문항 풀이'}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center whitespace-nowrap">
+                        {record.isCorrect !== undefined ? (
+                          record.isCorrect ? (
+                            <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-lg font-bold text-xs inline-flex items-center space-x-1">
+                              <i className="fa-solid fa-circle-check text-emerald-400"></i>
+                              <span>정답 (⭕)</span>
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/40 rounded-lg font-bold text-xs inline-flex items-center space-x-1">
+                              <i className="fa-solid fa-circle-xmark text-rose-400"></i>
+                              <span>오답 (❌)</span>
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-slate-500 font-mono">-</span>
+                        )}
+                      </td>
+                      <td className="p-3 text-slate-200">
+                        <div className="flex items-center space-x-2 text-xs">
+                          {record.selectedIndex !== undefined && (
+                            <span className={`px-2 py-0.5 rounded font-mono font-bold ${
+                              record.isCorrect ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                            }`}>
+                              학생 선택: {record.selectedIndex + 1}번
+                            </span>
+                          )}
+                          {record.correctIndex !== undefined && (
+                            <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded font-mono font-bold">
+                              정답: {record.correctIndex + 1}번
+                            </span>
+                          )}
+                          {!record.selectedIndex && !record.correctIndex && (
+                            <span className="text-slate-400 text-[11px]">{record.content}</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Detailed Student Analytics & Records Table */}
       {(activeMainTab === 'all' || activeMainTab === 'students') && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
@@ -1328,30 +1653,51 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                             <span className="font-bold text-amber-300 font-mono">{std.totalDwellTimeMinutes}</span> 분
                           </td>
                           <td className="py-3 px-3 font-bold text-purple-300 font-mono">{std.completedPassagesCount} 지문</td>
-                          {/* 변형 문제 & 정오답 표시 컬럼 */}
-                          <td className="py-3 px-3">
+                          {/* 변형 문제 & 정답 현황 표시 컬럼 (클릭 시 상단 정답 현황 또는 아코디언 정답탭으로 이동) */}
+                          <td className="py-3 px-3" onClick={(e) => e.stopPropagation()}>
                             {totalQuizCount === 0 ? (
                               <span className="text-slate-500 font-mono text-xs">미응시</span>
                             ) : (
-                              <div className="space-y-1">
-                                <div className="font-bold text-cyan-300 font-mono text-xs">
-                                  {totalQuizCount}문제 풀이
-                                </div>
-                                {quizLogs.length > 0 ? (
-                                  <div className="flex items-center space-x-1.5 text-[10px]">
-                                    <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded font-bold font-mono" title="정답 개수">
-                                      ✓ {correctCount}
+                              <div className="space-y-1.5">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // 1) 상단 전용 퀴즈/정답 모아보기 섹션 필터 세팅
+                                    setQuizStudentFilter(std.email);
+                                    // 2) 아코디언 탭을 quiz로 열기
+                                    setStudentAccordionTab((prev) => ({ ...prev, [std.id]: 'quiz' }));
+                                    if (!expandedStudentIds.includes(std.id)) {
+                                      setExpandedStudentIds((prev) => [...prev, std.id]);
+                                    }
+                                    // 3) 상단 정답 모아보기 섹션으로 부드럽게 스크롤
+                                    setTimeout(() => {
+                                      document.getElementById('student-quizzes-section')?.scrollIntoView({ behavior: 'smooth' });
+                                    }, 100);
+                                  }}
+                                  className="w-full text-left group/quizBtn px-2.5 py-1.5 bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-500/30 hover:border-cyan-400/60 rounded-xl transition-all cursor-pointer shadow-sm"
+                                  title={`${std.name} 학생의 문제 풀이 및 정답 상세 확인 (클릭 시 상단 정답 확인으로 이동)`}
+                                >
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="font-bold text-cyan-300 font-mono group-hover/quizBtn:text-cyan-200 flex items-center space-x-1">
+                                      <i className="fa-solid fa-bullseye text-[10px]"></i>
+                                      <span>{totalQuizCount}문항 풀이</span>
                                     </span>
-                                    <span className="px-1.5 py-0.2 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded font-bold font-mono" title="오답 개수">
-                                      ✗ {incorrectCount}
-                                    </span>
-                                    <span className="text-slate-400 font-mono text-[10px]">
-                                      ({Math.round((correctCount / quizLogs.length) * 100)}%)
-                                    </span>
+                                    <i className="fa-solid fa-arrow-up-right-from-square text-[9px] text-cyan-400/70 group-hover/quizBtn:text-cyan-300"></i>
                                   </div>
-                                ) : (
-                                  <span className="text-[10px] text-slate-500">기록 집계 중</span>
-                                )}
+                                  {quizLogs.length > 0 && (
+                                    <div className="flex items-center space-x-1.5 text-[10px] mt-1">
+                                      <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded font-bold font-mono">
+                                        ✓ {correctCount}
+                                      </span>
+                                      <span className="px-1.5 py-0.2 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded font-bold font-mono">
+                                        ✗ {incorrectCount}
+                                      </span>
+                                      <span className="text-slate-400 font-mono text-[10px]">
+                                        ({Math.round((correctCount / quizLogs.length) * 100)}%)
+                                      </span>
+                                    </div>
+                                  )}
+                                </button>
                               </div>
                             )}
                           </td>
@@ -1367,7 +1713,8 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      // 1) 즉시 아코디언 행 열기
+                                      // 1) 즉시 아코디언 행 열기 & reflection 탭 설정
+                                      setStudentAccordionTab((prev) => ({ ...prev, [std.id]: 'reflection' }));
                                       if (!expandedStudentIds.includes(std.id)) {
                                         setExpandedStudentIds((prev) => [...prev, std.id]);
                                       }
@@ -1417,93 +1764,167 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                           </td>
                         </tr>
 
-                        {/* Accordion Expanded Row for Inline Records Preview */}
+                        {/* Accordion Expanded Row for Inline Records Preview (Separated Quiz Answers vs Reflections) */}
                         {isExpanded && (
-                          <tr className="bg-slate-950/80 border-b border-slate-800">
+                          <tr className="bg-slate-950/90 border-b border-slate-800">
                             <td colSpan={9} className="p-4 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-2">
-                                  <i className="fa-solid fa-folder-open text-purple-400 text-xs"></i>
-                                  <span className="font-bold text-slate-200 text-xs">
-                                    [{std.name}] 학생 실시간 학습 기록
-                                  </span>
-                                  {quizLogs.length > 0 && (
-                                    <span className="flex items-center space-x-1 text-[10px]">
-                                      <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded font-bold font-mono">
-                                        ✓ 정답 {correctCount}
-                                      </span>
-                                      <span className="px-1.5 py-0.2 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded font-bold font-mono">
-                                        ✗ 오답 {incorrectCount}
-                                      </span>
-                                    </span>
-                                  )}
-                                  <span className="text-[11px] text-slate-400 font-mono">
-                                    (총 {effectiveRecords.length}건)
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={() => setSelectedStudentForRecords(std)}
-                                  className="text-xs text-cyan-400 hover:text-cyan-300 font-bold flex items-center space-x-1 underline decoration-cyan-500/40 cursor-pointer"
-                                >
-                                  <span>전체 기록 {effectiveRecords.length}건 팝업으로 상세 보기</span>
-                                  <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-                                </button>
-                              </div>
+                              {/* Sub-tabs: Quiz Answers vs Reflections */}
+                              {(() => {
+                                const currentTab = studentAccordionTab[std.id] || 'quiz';
+                                const stdQuizLogs = effectiveRecords.filter((r) => r.sourceType === 'quiz');
+                                const stdReflectionLogs = effectiveRecords.filter((r) => r.sourceType === 'reflection');
 
-                              {effectiveRecords.length === 0 ? (
-                                <p className="text-xs text-slate-500 py-3 text-center bg-slate-900/50 rounded-xl border border-slate-800/60">
-                                  아직 작성한 학습 소감이나 문제 풀이 기록이 없습니다.
-                                </p>
-                              ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                  {recentLogs.map((rec) => (
-                                    <div
-                                      key={rec.id}
-                                      className={`p-3 rounded-xl border space-y-2 text-xs ${
-                                        rec.sourceType === 'reflection'
-                                          ? 'bg-purple-950/20 border-purple-500/30'
-                                          : 'bg-slate-900 border-slate-800'
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-between text-[11px]">
-                                        <span className="font-bold text-slate-300 truncate max-w-[150px]">
-                                          {rec.lesson} {rec.itemNo} {rec.passageTitle}
-                                        </span>
-                                        <span className="text-slate-500 font-mono text-[10px]">
-                                          {rec.relativeTime}
-                                        </span>
-                                      </div>
-
-                                      <div className="flex items-center space-x-1.5 text-[10px]">
-                                        <span
-                                          className={`px-1.5 py-0.5 rounded font-bold ${
-                                            rec.sourceType === 'reflection'
-                                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                                              : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                                return (
+                                  <div className="space-y-3">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-2">
+                                      <div className="flex items-center space-x-2">
+                                        <button
+                                          onClick={() => setStudentAccordionTab((prev) => ({ ...prev, [std.id]: 'quiz' }))}
+                                          className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                                            currentTab === 'quiz'
+                                              ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-950/50'
+                                              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
                                           }`}
                                         >
-                                          {rec.questionType}
-                                        </span>
-                                        {rec.isCorrect !== undefined && (
-                                          <span
-                                            className={`px-1.5 py-0.5 rounded font-bold ${
-                                              rec.isCorrect
-                                                ? 'bg-emerald-500/20 text-emerald-400'
-                                                : 'bg-rose-500/20 text-rose-400'
-                                            }`}
-                                          >
-                                            {rec.isCorrect ? '⭕ 정답' : '❌ 오답'}
-                                          </span>
-                                        )}
+                                          <i className="fa-solid fa-bullseye"></i>
+                                          <span>🎯 정답 & 문제 풀이 내역 ({stdQuizLogs.length}건)</span>
+                                        </button>
+
+                                        <button
+                                          onClick={() => setStudentAccordionTab((prev) => ({ ...prev, [std.id]: 'reflection' }))}
+                                          className={`px-3 py-1 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${
+                                            currentTab === 'reflection'
+                                              ? 'bg-rose-500 text-white shadow-md shadow-rose-950/50'
+                                              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+                                          }`}
+                                        >
+                                          <i className="fa-solid fa-pen-fancy"></i>
+                                          <span>✍️ 지문 성찰 소감 ({stdReflectionLogs.length}건)</span>
+                                        </button>
                                       </div>
 
-                                      <p className="text-slate-200 text-[11px] leading-relaxed line-clamp-3 bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 font-serif">
-                                        "{rec.content}"
-                                      </p>
+                                      <div className="flex items-center space-x-2">
+                                        <button
+                                          onClick={() => {
+                                            setQuizStudentFilter(std.email);
+                                            setTimeout(() => {
+                                              document.getElementById('student-quizzes-section')?.scrollIntoView({ behavior: 'smooth' });
+                                            }, 100);
+                                          }}
+                                          className="text-xs text-cyan-400 hover:text-cyan-300 font-bold flex items-center space-x-1 underline decoration-cyan-500/40 cursor-pointer"
+                                        >
+                                          <span>상단 정답 모아보기로 이동</span>
+                                          <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                                        </button>
+                                      </div>
                                     </div>
-                                  ))}
-                                </div>
-                              )}
+
+                                    {/* Tab 1: Quiz Answers List */}
+                                    {currentTab === 'quiz' && (
+                                      <div>
+                                        {stdQuizLogs.length === 0 ? (
+                                          <p className="text-xs text-slate-500 py-3 text-center bg-slate-900/50 rounded-xl border border-slate-800/60">
+                                            아직 응시한 변형문제 풀이 기록이 없습니다.
+                                          </p>
+                                        ) : (
+                                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                            {stdQuizLogs.map((q) => (
+                                              <div
+                                                key={q.id}
+                                                className={`p-3 rounded-xl border space-y-2 text-xs ${
+                                                  q.isCorrect === true
+                                                    ? 'bg-emerald-950/15 border-emerald-500/30'
+                                                    : q.isCorrect === false
+                                                    ? 'bg-rose-950/15 border-rose-500/30'
+                                                    : 'bg-slate-900 border-slate-800'
+                                                }`}
+                                              >
+                                                <div className="flex items-center justify-between">
+                                                  <span className="font-bold text-slate-200 truncate max-w-[150px]">
+                                                    {q.lesson} {q.itemNo}
+                                                  </span>
+                                                  <span
+                                                    className={`px-1.5 py-0.5 rounded font-black text-[10px] ${
+                                                      q.isCorrect === true
+                                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                                        : q.isCorrect === false
+                                                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                                        : 'bg-slate-800 text-slate-400'
+                                                    }`}
+                                                  >
+                                                    {q.isCorrect === true ? '⭕ 정답' : q.isCorrect === false ? '❌ 오답' : '응시'}
+                                                  </span>
+                                                </div>
+
+                                                <div className="text-[11px] text-slate-400 truncate">
+                                                  {q.passageTitle} · {q.questionType}
+                                                </div>
+
+                                                {/* Student Answer vs Correct Answer Box */}
+                                                <div className="bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 space-y-1">
+                                                  <div className="flex items-center justify-between text-[11px]">
+                                                    <span className="text-slate-400">학생 선택 답안:</span>
+                                                    <span className={`font-mono font-bold ${q.isCorrect ? 'text-emerald-300' : 'text-rose-300'}`}>
+                                                      {q.selectedIndex !== undefined ? `${q.selectedIndex + 1}번` : '답안 기록됨'}
+                                                    </span>
+                                                  </div>
+                                                  {q.correctIndex !== undefined && (
+                                                    <div className="flex items-center justify-between text-[11px]">
+                                                      <span className="text-slate-400">실제 정답:</span>
+                                                      <span className="font-mono font-bold text-emerald-400">
+                                                        {q.correctIndex + 1}번
+                                                      </span>
+                                                    </div>
+                                                  )}
+                                                </div>
+
+                                                <div className="text-[10px] text-slate-500 font-mono text-right">
+                                                  {q.relativeTime}
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Tab 2: Pure Reflection List */}
+                                    {currentTab === 'reflection' && (
+                                      <div>
+                                        {stdReflectionLogs.length === 0 ? (
+                                          <p className="text-xs text-slate-500 py-3 text-center bg-slate-900/50 rounded-xl border border-slate-800/60">
+                                            아직 작성한 지문 학습 성찰 소감이 없습니다.
+                                          </p>
+                                        ) : (
+                                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                            {stdReflectionLogs.map((ref) => (
+                                              <div
+                                                key={ref.id}
+                                                className="p-3 rounded-xl border bg-purple-950/20 border-purple-500/30 space-y-2 text-xs"
+                                              >
+                                                <div className="flex items-center justify-between text-[11px]">
+                                                  <span className="font-bold text-purple-200 truncate max-w-[150px]">
+                                                    {ref.lesson} {ref.itemNo}
+                                                  </span>
+                                                  <span className="text-slate-500 font-mono text-[10px]">
+                                                    {ref.relativeTime}
+                                                  </span>
+                                                </div>
+                                                <div className="text-[11px] text-slate-400 truncate">
+                                                  {ref.passageTitle}
+                                                </div>
+                                                <p className="text-slate-200 text-[11px] leading-relaxed line-clamp-3 bg-slate-950/80 p-2 rounded-lg border border-slate-800/80 font-serif">
+                                                  "{ref.content}"
+                                                </p>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </td>
                           </tr>
                         )}
@@ -1978,32 +2399,45 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         );
       })()}
 
-      {/* Upgraded S1: Real-time Unified Learning Event & Reflection Stream (최신순 누적 스트림) */}
-      {(activeMainTab === 'all' || activeMainTab === 'feed') && (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
+      {/* Upgraded S1: Real-time Pure Reflection Stream (지문 학습 성찰 소감 전용 스트림) */}
+      {(activeMainTab === 'all' || activeMainTab === 'feed' || activeMainTab === 'reflections') && (
+        <div className="bg-slate-900 border border-purple-500/30 rounded-3xl p-5 space-y-4 shadow-xl">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
             <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
-                <i className="fa-solid fa-bolt"></i>
+              <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
+                <i className="fa-solid fa-pen-fancy"></i>
               </div>
               <div>
                 <div className="flex items-center space-x-2">
-                  <h3 className="text-sm font-bold text-white">실시간 학생 학습 기록 & 사고 이력 누적 스트림 (최신순)</h3>
-                  <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold rounded-md flex items-center space-x-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>최신순 실시간 정렬 중</span>
+                  <h3 className="text-sm font-bold text-white">✍️ 실시간 학생 지문 학습 성찰 & 소감 기록 스트림 (최신순)</h3>
+                  <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-bold rounded-md flex items-center space-x-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse"></span>
+                    <span>성찰 소감 전용 실시간 스트림</span>
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  모든 수강생의 지문 학습 소감 및 변형문제 풀이 사고 근거가 작성 시각 기준 내림차순(최신순)으로 자동 집계됩니다.
+                  수강생들이 지문 학습 후 작성한 탐구·메타인지 성찰 소감만 모아서 최신순으로 표시합니다. (문제 풀이 및 정답 확인은 상단 항목을 이용해 주세요.)
                 </p>
               </div>
             </div>
 
             <div className="flex items-center space-x-2 text-xs">
+              {/* Button to quickly jump to upper quizzes & answers section */}
+              <button
+                onClick={() => {
+                  document.getElementById('student-quizzes-section')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="px-3 py-1.5 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-cyan-200 border border-cyan-500/40 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition-all shadow-sm cursor-pointer"
+                title="상단 학생별 문제 풀이 & 정답 현황으로 바로 이동"
+              >
+                <i className="fa-solid fa-bullseye text-[11px]"></i>
+                <span>🎯 상단 정답 현황 보기</span>
+                <i className="fa-solid fa-arrow-up text-[10px]"></i>
+              </button>
+
               <span className="text-xs text-slate-400 font-mono">
-                총 <strong className="text-cyan-300 font-bold">{allUnifiedRecords.length}건</strong> 누적됨
+                총 <strong className="text-purple-300 font-bold">{allReflectionsOnly.length}건</strong>
               </span>
               <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800">
                 <button
@@ -2030,53 +2464,12 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
           {/* Filter Bar Controls */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950 p-3 rounded-2xl border border-slate-800/80">
-            {/* Category Filter Pills */}
+            {/* Category Filter Badge */}
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              <button
-                onClick={() => {
-                  setFeedFilter('all');
-                  setFeedVisibleCount(20);
-                }}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all ${
-                  feedFilter === 'all'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
-              >
-                전체 최신 기록 ({allUnifiedRecords.length})
-              </button>
-              <button
-                onClick={() => {
-                  setFeedFilter('reflection');
-                  setFeedVisibleCount(20);
-                }}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center space-x-1.5 ${
-                  feedFilter === 'reflection'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
-              >
-                <span>✍️ 지문 학습 소감</span>
-                <span className="font-mono text-[10px] text-purple-300">
-                  ({allUnifiedRecords.filter((r) => r.sourceType === 'reflection').length})
-                </span>
-              </button>
-              <button
-                onClick={() => {
-                  setFeedFilter('quiz');
-                  setFeedVisibleCount(20);
-                }}
-                className={`px-3 py-1.5 rounded-xl font-bold transition-all flex items-center space-x-1.5 ${
-                  feedFilter === 'quiz'
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
-              >
-                <span>🎯 변형문제 풀이 & 사고 근거</span>
-                <span className="font-mono text-[10px] text-cyan-300">
-                  ({allUnifiedRecords.filter((r) => r.sourceType === 'quiz').length})
-                </span>
-              </button>
+              <span className="px-3 py-1.5 rounded-xl font-bold bg-purple-600 text-white shadow-md flex items-center space-x-1.5">
+                <i className="fa-solid fa-feather"></i>
+                <span>지문 학습 성찰 소감만 표시 중 ({allReflectionsOnly.length}건)</span>
+              </span>
             </div>
 
             {/* Student Filter Dropdown & Search Bar */}
@@ -2117,9 +2510,9 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
           {filteredFeedRecords.length === 0 ? (
             <div className="py-12 text-center text-slate-500 space-y-2 bg-slate-950/40 rounded-2xl border border-slate-800/60">
               <i className="fa-solid fa-inbox text-3xl text-slate-600"></i>
-              <p className="text-xs font-semibold text-slate-300">해당 조건에 부합하는 실시간 기록이 없습니다.</p>
+              <p className="text-xs font-semibold text-slate-300">해당 조건에 부합하는 실시간 지문 학습 성찰 소감이 없습니다.</p>
               <p className="text-[11px] text-slate-500">
-                학생들이 학습 소감을 제출하거나 변형문제를 풀면 실시간으로 최신순 피드에 즉시 나타납니다.
+                학생들이 지문 학습 후 성찰 소감을 작성하면 실시간으로 최신순 피드에 즉시 나타납니다.
               </p>
             </div>
           ) : feedViewMode === 'cards' ? (
@@ -2133,23 +2526,13 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                 return (
                   <div
                     key={record.id}
-                    className={`p-4 rounded-2xl border space-y-2.5 transition-all ${
-                      record.sourceType === 'reflection'
-                        ? 'bg-purple-950/15 border-purple-500/30 hover:border-purple-500/60'
-                        : 'bg-slate-950 border-slate-800 hover:border-cyan-500/40'
-                    }`}
+                    className="p-4 rounded-2xl border space-y-2.5 transition-all bg-purple-950/15 border-purple-500/30 hover:border-purple-500/60"
                   >
                     {/* Card Top Header */}
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                       <div className="flex items-center space-x-2.5">
-                        <div
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold ${
-                            record.sourceType === 'reflection'
-                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                              : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                          }`}
-                        >
-                          <i className={`fa-solid ${record.sourceType === 'reflection' ? 'fa-pen-fancy' : 'fa-wand-magic-sparkles'}`}></i>
+                        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                          <i className="fa-solid fa-pen-fancy"></i>
                         </div>
                         <div>
                           <div className="flex items-center space-x-2">
@@ -2164,14 +2547,8 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
                       {/* Badges */}
                       <div className="flex items-center space-x-2 text-[11px]">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-lg font-bold ${
-                            record.sourceType === 'reflection'
-                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-                              : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                          }`}
-                        >
-                          {record.questionType}
+                        <span className="px-2.5 py-0.5 rounded-lg font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                          {record.questionType || '지문 탐구 소감'}
                         </span>
 
                         {record.metacognitiveStatus && (
@@ -2195,10 +2572,8 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
 
                     {/* Bottom Actions */}
                     <div className="flex items-center justify-between text-[11px] pt-1">
-                      <span className="text-[10px] text-slate-500">
-                        {record.sourceType === 'reflection'
-                          ? '지문 심층 분석 & 메타인지 성찰 기록'
-                          : '수능 유형별 변형 문제 풀이 및 사고 근거'}
+                      <span className="text-[10px] text-purple-400/80 font-medium">
+                        지문 심층 분석 & 메타인지 성찰 기록 (생활기록부 세특 자산)
                       </span>
 
                       {matchedStudent && (
@@ -2208,7 +2583,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                             className="text-cyan-400 hover:text-cyan-300 text-[11px] font-bold flex items-center space-x-1 underline decoration-cyan-500/30"
                           >
                             <i className="fa-solid fa-user-clock text-[10px]"></i>
-                            <span>이 학생의 전체 기록 보기</span>
+                            <span>전체 기록 확인</span>
                           </button>
                           <button
                             onClick={() => handleGenerateStudentReport(matchedStudent)}
@@ -2233,8 +2608,8 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
                     <th className="p-2.5">일시 (최신순)</th>
                     <th className="p-2.5">작성 학생</th>
                     <th className="p-2.5">대상 지문</th>
-                    <th className="p-2.5">학습 유형</th>
-                    <th className="p-2.5">학생 작성 본문 (소감 / 사고 근거)</th>
+                    <th className="p-2.5">성찰 유형</th>
+                    <th className="p-2.5">학생 작성 지문 성찰 소감</th>
                     <th className="p-2.5 text-right">학생 기록</th>
                   </tr>
                 </thead>

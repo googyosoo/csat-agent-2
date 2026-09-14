@@ -922,23 +922,26 @@ export function getStoredLearningEvents(): LearningEvent[] {
           if (!e) return;
           const id = e.id || `evt-recovered-${idx}-${Date.now()}`;
           const email = (e.studentEmail || e.email || 'guest_student@simin.hs.kr').trim();
-          const normalized: LearningEvent = {
-            id,
-            studentEmail: email,
-            studentName: e.studentName || e.name || (email.includes('@') ? email.split('@')[0] : '학습자'),
-            passageId: e.passageId || '',
-            passageTitle: e.passageTitle || '수능 영어 지문',
-            lesson: e.lesson || '',
-            itemNo: e.itemNo || '',
-            questionType: e.questionType || (e.reasonText ? '지문 학습 소감 & 세특' : '변형문제 풀이'),
-            difficulty: e.difficulty || '',
-            selectedIndex: e.selectedIndex,
-            correctIndex: e.correctIndex,
-            isCorrect: e.isCorrect,
-            reasonText: e.reasonText || e.content || '',
-            elapsedMs: e.elapsedMs || 0,
-            timestamp: e.timestamp || new Date().toISOString(),
-          };
+            const rawReason = (e.reasonText || e.content || '').trim();
+            const isQuizPlaceholder = !rawReason || rawReason === '오답 선택' || rawReason === '정답 선택' || rawReason === '정답을 올바르게 도출함' || rawReason === '오답 선택 후 오답 원인 분석';
+            const defaultType = (e.isCorrect !== undefined || isQuizPlaceholder) ? '변형문제 풀이' : '지문 학습 소감 & 세특';
+            const normalized: LearningEvent = {
+              id,
+              studentEmail: email,
+              studentName: e.studentName || e.name || (email.includes('@') ? email.split('@')[0] : '학습자'),
+              passageId: e.passageId || '',
+              passageTitle: e.passageTitle || '수능 영어 지문',
+              lesson: e.lesson || '',
+              itemNo: e.itemNo || '',
+              questionType: e.questionType || defaultType,
+              difficulty: e.difficulty || '',
+              selectedIndex: e.selectedIndex,
+              correctIndex: e.correctIndex,
+              isCorrect: e.isCorrect,
+              reasonText: rawReason,
+              elapsedMs: e.elapsedMs || 0,
+              timestamp: e.timestamp || new Date().toISOString(),
+            };
 
           if (!eventMap.has(id)) {
             eventMap.set(id, normalized);
