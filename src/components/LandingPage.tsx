@@ -54,7 +54,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartGuestPreview })
         {/* Top Badge */}
         <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-950/60 border border-blue-500/30 text-blue-300 text-xs font-semibold shadow-sm">
           <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
-          <span>심인고등학교 학생 전용 (@simin.hs.kr) 공식 AI 학습 게이트</span>
+          <span>심인고등학교 및 모든 학습자를 위한 공식 AI 수능 학습 게이트</span>
         </div>
 
         {/* Main Heading */}
@@ -88,9 +88,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartGuestPreview })
               <i className={`fa-brands fa-google text-lg ${isLoggingIn ? 'fa-spin' : ''}`}></i>
               <span>{isLoggingIn ? '인증 진행 중...' : 'Google 계정으로 시작하기'}</span>
             </button>
-            <span className="text-[11px] text-slate-500 mt-2 font-mono flex items-center space-x-1">
-              <i className="fa-solid fa-lock text-[10px]"></i>
-              <span>@simin.hs.kr 학교 이메일 전용</span>
+            <span className="text-[11px] text-slate-400 mt-2 font-mono flex items-center space-x-1">
+              <i className="fa-solid fa-globe text-[10px] text-blue-400"></i>
+              <span>모든 Google 계정으로 즉시 로그인 및 학습 가능</span>
             </span>
           </div>
         </div>

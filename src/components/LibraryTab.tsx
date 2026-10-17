@@ -134,7 +134,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           <div className="p-3 bg-blue-950/40 border border-blue-500/30 rounded-xl text-blue-200 text-xs flex items-center justify-between gap-2 my-2">
             <span className="flex items-center space-x-2">
               <i className="fa-solid fa-user-lock text-blue-400"></i>
-              <span>Google 로그인(@simin.hs.kr) 후 문제 풀이 성취도 및 세특 학습 기록이 자동 저장됩니다.</span>
+              <span>Google 로그인 후 문제 풀이 성취도 및 세특 학습 기록이 자동 저장됩니다.</span>
             </span>
             <button
               type="button"
