@@ -1,9 +1,35 @@
+import { auth } from './firebase';
+
+/** Send Firebase identity only to this app's own API, never to third-party URLs. */
+export async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const target = new URL(url, window.location.origin);
+  const apiPath = target.pathname.toLowerCase();
+  const isLocalApi = target.origin === window.location.origin && (apiPath === '/api' || apiPath.startsWith('/api/'));
+  if (!isLocalApi) return fetch(url, options);
+
+  const method = (options.method || 'GET').toUpperCase();
+  const protectedRecord = /^\/api\/analytics(?:\/|$)/.test(apiPath)
+    || /^\/api\/gemini\/student-report\/?$/.test(apiPath)
+    || (/^\/api\/transformed-questions(?:\/|$)/.test(apiPath) && !['GET', 'HEAD', 'OPTIONS'].includes(method));
+  const user = auth.currentUser;
+  if (!user) {
+    if (protectedRecord) throw new Error('학생 기록을 이용하려면 Google 계정으로 로그인해 주세요.');
+    return fetch(url, options);
+  }
+
+  const token = await user.getIdToken();
+  if (auth.currentUser?.uid !== user.uid) throw new Error('계정이 변경되었습니다. 다시 시도해 주세요.');
+  const headers = new Headers(options.headers);
+  headers.set('Authorization', 'Bearer ' + token);
+  return fetch(url, { ...options, headers });
+}
+
 /**
  * Helper utility to safely execute fetch requests and handle JSON responses,
  * preventing 'Unexpected token <' errors when server returns HTML error pages.
  */
 export async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(url, options);
+  const response = await authenticatedFetch(url, options);
   
   const contentType = response.headers.get('content-type') || '';
   

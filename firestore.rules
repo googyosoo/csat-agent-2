@@ -1,0 +1,39 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function verified() {
+      return request.auth != null && request.auth.token.email_verified == true
+        && request.auth.token.email is string;
+    }
+    function admin() {
+      return verified() && request.auth.token.email.lower() in [
+        'sitech3@simin.hs.kr', 'hongjinwoo@simin.hs.kr'
+      ];
+    }
+    function owner(data, field) {
+      return verified() && field in data && data[field] is string
+        && data[field].lower() == request.auth.token.email.lower();
+    }
+    function ownCreate(field) { return owner(request.resource.data, field); }
+    function ownUpdate(field) {
+      return owner(resource.data, field) && owner(request.resource.data, field)
+        && request.resource.data[field] == resource.data[field];
+    }
+    match /students/{id} {
+      allow read, delete: if admin() || owner(resource.data, 'email');
+      allow create: if admin() || ownCreate('email');
+      allow update: if admin() || ownUpdate('email');
+    }
+    match /socratic_logs/{id} {
+      allow read, delete: if admin() || owner(resource.data, 'studentEmail');
+      allow create: if admin() || ownCreate('studentEmail');
+      allow update: if admin() || ownUpdate('studentEmail');
+    }
+    match /learningEvents/{id} {
+      allow read, delete: if admin() || owner(resource.data, 'studentEmail');
+      allow create: if admin() || ownCreate('studentEmail');
+      allow update: if admin() || ownUpdate('studentEmail');
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

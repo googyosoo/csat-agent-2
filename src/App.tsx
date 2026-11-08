@@ -27,15 +27,23 @@ export default function App() {
   const [showIngestModal, setShowIngestModal] = useState(false);
   const [showMistakeVault, setShowMistakeVault] = useState(false);
   const [authUser, setAuthUser] = useState<User | null>(null);
+  const [recordSyncWarning, setRecordSyncWarning] = useState<string | null>(null);
   const [deniedReason, setDeniedReason] = useState<string | null>(null);
   const [isGuestPreview, setIsGuestPreview] = useState(false);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // 0. Auto-sync any local data (logged-in or guest/offline) to cloud immediately on app startup
   useEffect(() => {
-    autoSyncAllLocalDataToCloud();
-  }, []);
+    setRecordSyncWarning(null);
+    const handleSyncError = (event: Event) => {
+      const message = (event as CustomEvent).detail;
+      if (typeof message === 'string') setRecordSyncWarning(message);
+    };
+    window.addEventListener('csat_analytics_sync_error', handleSyncError);
+    return () => window.removeEventListener('csat_analytics_sync_error', handleSyncError);
+  }, [authUser?.uid]);
+
+  // Cloud sync starts only after Firebase has established the current account.
 
   // 1. Listen to Firebase Authentication state (mounted once)
   useEffect(() => {
@@ -55,6 +63,7 @@ export default function App() {
         setDeniedReason(null);
         setAuthUser(user);
         recordUserLogin(user);
+        void autoSyncAllLocalDataToCloud();
       } else {
         setAuthUser(null);
       }
@@ -164,6 +173,16 @@ export default function App() {
           onOpenMistakeVault={() => setShowMistakeVault(true)}
         />
 
+        {recordSyncWarning && (
+          <div role="status" className="flex flex-wrap items-center gap-3 bg-amber-950 px-4 py-3 text-sm text-amber-100">
+            <span>기록 전송 대기: {recordSyncWarning} 브라우저 원본 기록은 유지됩니다.</span>
+            <button type="button" className="underline" onClick={() => {
+              setRecordSyncWarning(null);
+              void autoSyncAllLocalDataToCloud();
+            }}>다시 전송</button>
+          </div>
+        )}
+
         {/* Mobile Quick Navigation Chips Bar (Mobile/Tablet Only) */}
         <div className="md:hidden bg-slate-900 border-b border-slate-800 px-3 py-2 flex items-center space-x-1.5 overflow-x-auto shrink-0 no-scrollbar">
           {[
@@ -207,8 +226,8 @@ export default function App() {
             <GeneratorTab selectedPassage={selectedPassage} customApiKey={customApiKey} authUser={authUser} />
           )}
           {activeTab === 'vocab' && <VocabTab selectedPassage={selectedPassage} onSpeak={speakText} />}
-          {activeTab === 'student-dashboard' && <StudentDashboardTab authUser={authUser} />}
-          {activeTab === 'admin' && <AdminDashboardTab authUser={authUser} />}
+          {activeTab === 'student-dashboard' && <StudentDashboardTab key={authUser?.uid || 'guest'} authUser={authUser} />}
+          {activeTab === 'admin' && <AdminDashboardTab key={authUser?.uid || 'guest'} authUser={authUser} />}
         </div>
       </main>
 

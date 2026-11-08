@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { User } from '../lib/firebase';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { User, auth } from '../lib/firebase';
 import {
   StudentActivity,
   SocraticSummary,
@@ -24,7 +24,12 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
   const [mySocraticLogs, setMySocraticLogs] = useState<SocraticSummary[]>([]);
   const [myLearningEvents, setMyLearningEvents] = useState<LearningEvent[]>([]);
 
+  const lifecycle = useRef(0);
+  const isCurrent = (uid: string, generation: number) => lifecycle.current === generation && auth.currentUser?.uid === uid && !!auth.currentUser?.emailVerified && (auth.currentUser.email || '').trim().toLowerCase() === currentEmail;
   const loadMyData = async () => {
+    const uid = authUser?.uid || '';
+    const generation = lifecycle.current;
+    if (!authUser?.emailVerified || !uid || !isCurrent(uid, generation)) return;
     // 1. Ensure local record and auto-sync local data to cloud
     const { students, idx } = ensureStudentRecord(currentEmail, currentName);
     let currentRecord = students[idx] || null;
@@ -38,14 +43,15 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
 
     const localSoc = authUser
       ? allLocalSoc.filter((s) => (s.studentEmail || '').toLowerCase().trim() === currentEmail)
-      : allLocalSoc;
+      : [];
 
     const localEv = authUser
       ? allLocalEv.filter((e) => (e.studentEmail || '').toLowerCase().trim() === currentEmail)
-      : allLocalEv;
+      : [];
 
     try {
       const serverData = await fetchServerAnalyticsData();
+      if (!isCurrent(uid, generation)) return;
       const matched = serverData.students.find(
         (s) => (s.email || '').toLowerCase().trim() === currentEmail
       );
@@ -54,11 +60,11 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
       }
       const filteredSoc = authUser
         ? serverData.socraticLogs.filter((s) => (s.studentEmail || '').toLowerCase().trim() === currentEmail)
-        : serverData.socraticLogs;
+        : [];
 
       const filteredEv = authUser
         ? serverData.learningEvents.filter((e) => (e.studentEmail || '').toLowerCase().trim() === currentEmail)
-        : serverData.learningEvents;
+        : [];
 
       // Merge server and local without duplicates
       const mergedSocMap = new Map<string, SocraticSummary>();
@@ -77,16 +83,26 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
       setMySocraticLogs(Array.from(mergedSocMap.values()));
       setMyLearningEvents(Array.from(mergedEvMap.values()));
     } catch (e) {
+      if (!isCurrent(uid, generation)) return;
       setMySocraticLogs(localSoc);
       setMyLearningEvents(localEv);
     }
 
-    setMyActivity(currentRecord);
+    if (isCurrent(uid, generation)) setMyActivity(currentRecord);
   };
 
+  useLayoutEffect(() => {
+    lifecycle.current += 1;
+    setMyActivity(null);
+    setMySocraticLogs([]);
+    setMyLearningEvents([]);
+    return () => { lifecycle.current += 1; };
+  }, [authUser?.uid, authUser?.email, authUser?.emailVerified]);
+
   useEffect(() => {
+    if (!authUser?.emailVerified) return;
     loadMyData();
-    const interval = setInterval(loadMyData, 1000);
+    const interval = setInterval(loadMyData, 15000);
 
     const handleUpdateEvent = () => {
       loadMyData();
@@ -102,7 +118,7 @@ export const StudentDashboardTab: React.FC<StudentDashboardTabProps> = ({ authUs
       window.removeEventListener('focus', handleUpdateEvent);
       document.removeEventListener('visibilitychange', handleUpdateEvent);
     };
-  }, [currentEmail, currentName]);
+  }, [authUser?.uid, authUser?.emailVerified, currentEmail, currentName]);
 
   const correctCount = myLearningEvents.filter((e) => e.isCorrect).length;
   const totalQuizCount = myLearningEvents.length;

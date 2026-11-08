@@ -1,3 +1,4 @@
+import { createRecordSecurity } from './server/record-security.mjs';
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -10,6 +11,9 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
+
+// Validate Firebase identity and scope records before any data handler.
+app.use(createRecordSecurity());
 
 // Helper to sanitize JSON response string from Gemini
 function cleanJsonString(str: string): string {

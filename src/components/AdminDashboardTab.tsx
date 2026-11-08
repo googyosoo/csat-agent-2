@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { User } from '../lib/firebase';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { User, auth } from '../lib/firebase';
 import { isAdminUser, ADMIN_EMAILS } from '../lib/adminAuth';
 import {
   StudentActivity,
@@ -66,6 +66,9 @@ export const isAutoQuizPlaceholder = (text?: string | null): boolean => {
 };
 
 export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }) => {
+  const hasAccess = !!authUser?.emailVerified && isAdminUser(authUser.email) && auth.currentUser?.uid === authUser.uid && !!auth.currentUser?.emailVerified && isAdminUser(auth.currentUser.email);
+  const lifecycle = useRef(0);
+  const adminIsCurrent = (uid: string, generation: number) => generation === lifecycle.current && auth.currentUser?.uid === uid && !!auth.currentUser?.emailVerified && isAdminUser(auth.currentUser.email);
   const [students, setStudents] = useState<StudentActivity[]>([]);
   const [socSummaries, setSocSummaries] = useState<SocraticSummary[]>([]);
   const [learningEvents, setLearningEvents] = useState<LearningEvent[]>([]);
@@ -184,11 +187,16 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   const [lastSyncTime, setLastSyncTime] = useState<string>('초기화 중...');
 
   const loadData = async () => {
+    if (!hasAccess || !authUser || !adminIsCurrent(authUser.uid, lifecycle.current)) return;
+    const uid = authUser.uid;
+    const generation = lifecycle.current;
     // 1. Trigger background cloud sync for any local logs
     autoSyncAllLocalDataToCloud();
 
     // 2. Fetch server & firestore data
     const { students: sList, socraticLogs: socList, learningEvents: evList } = await fetchServerAnalyticsData();
+
+    if (!adminIsCurrent(uid, generation)) return;
 
     // 3. Guarantee that locally stored summaries in this browser are also merged
     const localStudents = getStoredStudentActivities();
@@ -265,7 +273,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
       const actualSocCount = Array.from(mergedSocMap.values()).filter((soc) => {
         if (!soc || !soc.studentEmail) return false;
         const sEmail = soc.studentEmail.toLowerCase().trim();
-        return sEmail === key || (sEmail.includes('@') && key.includes('@') && sEmail.split('@')[0] === key.split('@')[0]);
+        return sEmail === key;
       }).length;
       std.socraticQuestionsCount = actualSocCount;
     });
@@ -274,21 +282,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
     const finalSocs = Array.from(mergedSocMap.values());
     const finalEvts = Array.from(mergedEvMap.values());
 
-    // CRITICAL: Permanently save all collected students and reflection logs into teacher's browser localStorage
-    // This guarantees the teacher dashboard NEVER loses any student reflections even after page refresh, server restart, or offline state.
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        if (finalSocs.length > 0) {
-          localStorage.setItem('csat_analytics_socratic_v1', JSON.stringify(finalSocs.slice(0, 500)));
-        }
-        if (finalStudents.length > 0) {
-          localStorage.setItem('csat_analytics_students_v1', JSON.stringify(finalStudents.slice(0, 500)));
-        }
-        if (finalEvts.length > 0) {
-          localStorage.setItem('csat_analytics_learning_events_v1', JSON.stringify(finalEvts.slice(0, 500)));
-        }
-      }
-    } catch (e) {}
+    if (!adminIsCurrent(uid, generation)) return;
 
     setStudents(finalStudents);
     setSocSummaries(finalSocs);
@@ -296,9 +290,26 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
     setLastSyncTime(new Date().toLocaleTimeString('ko-KR'));
   };
 
+  useLayoutEffect(() => {
+    lifecycle.current += 1;
+    setStudents([]);
+    setSocSummaries([]);
+    setLearningEvents([]);
+    setSelectedStudent(null);
+    setSelectedStudentForRecords(null);
+    setReportResult(null);
+    setReportError(null);
+    setShowSyncModal(false);
+    setShowResetConfirm(false);
+    setIsGeneratingReport(false);
+    setLastSyncTime('초기화 중...');
+    return () => { lifecycle.current += 1; };
+  }, [authUser?.uid, authUser?.email, authUser?.emailVerified]);
+
   useEffect(() => {
+    if (!hasAccess) return;
     loadData();
-    const intervalId = setInterval(loadData, 1000);
+    const intervalId = setInterval(loadData, 15000);
 
     const handleUpdateEvent = () => {
       loadData();
@@ -314,7 +325,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
       window.removeEventListener('focus', handleUpdateEvent);
       document.removeEventListener('visibilitychange', handleUpdateEvent);
     };
-  }, []);
+  }, [authUser?.uid, authUser?.email, authUser?.emailVerified, hasAccess]);
 
   const handleResetData = () => {
     clearAnalyticsData();
@@ -323,6 +334,10 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   };
 
   const handleGenerateStudentReport = async (student: StudentActivity) => {
+    if (!hasAccess || !authUser) return;
+    const uid = authUser.uid;
+    const generation = lifecycle.current;
+    if (!adminIsCurrent(uid, generation)) return;
     setSelectedStudent(student);
     setIsGeneratingReport(true);
     setReportResult(null);
@@ -346,15 +361,17 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
         }),
       });
 
+      if (!adminIsCurrent(uid, generation)) return;
       if (data.success && data.data) {
         setReportResult(data.data);
       } else {
         throw new Error(data.error || '보고서 생성 실패');
       }
     } catch (err: any) {
+      if (!adminIsCurrent(uid, generation)) return;
       setReportError(`AI 세특 & 피드백 리포트 생성 오류: ${err.message}`);
     } finally {
-      setIsGeneratingReport(false);
+      if (adminIsCurrent(uid, generation)) setIsGeneratingReport(false);
     }
   };
 
@@ -366,10 +383,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
   };
 
   // Check admin authorization
-  const isRealAdmin = authUser ? isAdminUser(authUser.email) : false;
-  const [previewMode, setPreviewMode] = useState<boolean>(false);
-
-  const hasAccess = isRealAdmin || previewMode;
+  // Authorization comes only from the current verified Firebase administrator.
   const metrics = calculateAnalyticsMetrics(students);
 
   const filteredStudents = students.filter(
@@ -740,12 +754,7 @@ export const AdminDashboardTab: React.FC<AdminDashboardTabProps> = ({ authUser }
           <br />
           허가된 관리자 계정: <span className="text-cyan-300 font-mono">{ADMIN_EMAILS.join(', ')}</span>
         </p>
-        <button
-          onClick={() => setPreviewMode(true)}
-          className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl border border-slate-700 transition-all"
-        >
-          관리자 뷰 미리보기 (테스트용)
-        </button>
+        <p className="text-xs text-slate-500">이메일 인증을 마친 관리자 계정으로 로그인해 주세요.</p>
       </div>
     );
   }
