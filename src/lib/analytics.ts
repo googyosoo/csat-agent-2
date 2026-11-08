@@ -2,8 +2,81 @@
  * Real-time Student Analytics & Learning Tracking Engine with Firebase Firestore & LocalStorage Persistence
  */
 
-import { db } from './firebase';
-import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
+import { auth, db, subscribeToAuth } from './firebase';
+import { isAdminUser } from './adminAuth';
+import { authenticatedFetch } from './api';
+import { collection, doc, setDoc, getDocs, query, where, DocumentReference, DocumentData } from 'firebase/firestore';
+
+
+const normalizeEmail = (value?: string | null): string => (value || '').trim().toLowerCase();
+const identityKey = () => {
+  const user = auth.currentUser;
+  return user ? JSON.stringify([user.uid, normalizeEmail(user.email), user.emailVerified]) : '';
+};
+let activeIdentityKey = identityKey();
+let identityGeneration = 0;
+function captureIdentity() {
+  const key = identityKey();
+  if (key !== activeIdentityKey) {
+    activeIdentityKey = key;
+    identityGeneration += 1;
+    firestoreCache = emptyAnalyticsCache();
+  }
+  const user = auth.currentUser;
+  return { key, generation: identityGeneration, uid: user?.uid || '',
+    email: normalizeEmail(user?.email), verified: !!user?.emailVerified,
+    admin: !!user?.emailVerified && isAdminUser(user.email) };
+}
+type AnalyticsIdentity = ReturnType<typeof captureIdentity>;
+function isCurrentIdentity(identity: AnalyticsIdentity): boolean {
+  const current = captureIdentity();
+  return current.key === identity.key && current.generation === identity.generation;
+}
+function canReadOwner(email: string | undefined, identity = captureIdentity()): boolean {
+  return identity.verified && !!identity.email && (identity.admin || normalizeEmail(email) === identity.email);
+}
+function filterStudents(rows: StudentActivity[], identity = captureIdentity()): StudentActivity[] {
+  return rows.filter(row => row && canReadOwner(row.email, identity)).map(row => ({ ...row,
+    socraticLogs: (row.socraticLogs || []).filter(log => log && canReadOwner(log.studentEmail, identity)),
+    learningEvents: (row.learningEvents || []).filter(event => event && canReadOwner(event.studentEmail, identity)),
+  }));
+}
+function emptyAnalyticsCache() {
+  return { students: [] as StudentActivity[], socraticLogs: [] as SocraticSummary[], learningEvents: [] as LearningEvent[], lastFetched: 0 };
+}
+subscribeToAuth(() => { captureIdentity(); });
+function ownerQuery(name: string, field: 'email' | 'studentEmail', identity: AnalyticsIdentity) {
+  const ref = collection(db, name);
+  return identity.admin ? ref : query(ref, where(field, '==', identity.email));
+}
+async function safeSetDoc(ref: DocumentReference<DocumentData>, row: StudentActivity | SocraticSummary | LearningEvent, options?: { merge: boolean }): Promise<void> {
+  const identity = captureIdentity();
+  const email = 'email' in row ? row.email : row.studentEmail;
+  if (!canReadOwner(email, identity) || !isCurrentIdentity(identity)) return;
+  const safe: Record<string, unknown> = { ...row };
+  for (const claim of ['role', 'isAdmin', 'admin', 'emailVerified', 'uid', 'ownerUid']) delete safe[claim];
+  if (normalizeEmail(email) === identity.email) safe.ownerUid = identity.uid;
+  if ('email' in row) {
+    safe.socraticLogs = (row.socraticLogs || []).filter(log => normalizeEmail(log.studentEmail) === normalizeEmail(email));
+    safe.learningEvents = (row.learningEvents || []).filter(event => normalizeEmail(event.studentEmail) === normalizeEmail(email));
+  }
+  if (!isCurrentIdentity(identity)) return;
+  if (options) await setDoc(ref, safe, options);
+  else await setDoc(ref, safe);
+}
+// Retain raw records owned by other browser accounts on disk.
+function persistAnalyticsRows(key: string, rows: unknown[]): void {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+    const map = new Map<string, unknown>();
+    for (const row of [...(Array.isArray(parsed) ? parsed : []), ...rows] as any[]) {
+      if (!row || typeof row !== 'object') continue;
+      const owner = normalizeEmail(row.studentEmail || row.email);
+      map.set(owner + ':' + (key === STORAGE_KEY_STUDENTS ? owner : row.id || JSON.stringify(row)), row);
+    }
+    localStorage.setItem(key, JSON.stringify(Array.from(map.values())));
+  } catch {}
+}
 
 export interface StudentActivity {
   id: string;
@@ -112,72 +185,158 @@ export function notifyAnalyticsUpdated() {
   }
 }
 
-/**
- * Async Sync activity data to backend server for cross-browser admin tracking
- */
-export async function syncAnalyticsToServer(data: {
+
+/** Public warning contract: CustomEvent<string>, no record or account details. */
+function notifyAnalyticsSyncError(message: string): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent<string>('csat_analytics_sync_error', { detail: message }));
+  }
+}
+async function sendAnalyticsRequest(url: string, identity: AnalyticsIdentity, options?: RequestInit): Promise<Response | null> {
+  if (!isCurrentIdentity(identity)) return null;
+  try {
+    const response = await authenticatedFetch(url, options);
+    if (!isCurrentIdentity(identity)) return null;
+    if (!response.ok) {
+      notifyAnalyticsSyncError('학습 기록 동기화에 실패했습니다. 브라우저의 기록은 보존되어 있습니다. 잠시 후 다시 시도해 주세요.');
+    }
+    return response;
+  } catch {
+    if (isCurrentIdentity(identity)) notifyAnalyticsSyncError('학습 기록 서버에 연결하지 못했습니다. 브라우저의 기록은 보존되어 있습니다.');
+    return null;
+  }
+}
+type AnalyticsSyncData = {
   student?: StudentActivity;
   students?: StudentActivity[];
   socraticLog?: SocraticSummary;
   socraticLogs?: SocraticSummary[];
-  learningEvent?: any;
-  learningEvents?: any[];
-}): Promise<void> {
-  notifyAnalyticsUpdated();
-  try {
-    await fetch('/api/analytics/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+  learningEvent?: LearningEvent;
+  learningEvents?: LearningEvent[];
+};
+type AnalyticsBatch = { students: StudentActivity[]; socraticLogs: SocraticSummary[]; learningEvents: LearningEvent[] };
+function ownSyncRows(data: AnalyticsSyncData, identity: AnalyticsIdentity): AnalyticsBatch {
+  const students = filterStudents([...(data.students || []), ...(data.student ? [data.student] : [])], { ...identity, admin: false });
+  const own = (row: { studentEmail: string }) => row && normalizeEmail(row.studentEmail) === identity.email;
+  const dedupe = <T extends { id: string; studentEmail: string }>(rows: T[]): T[] => {
+    const map = new Map<string, T>();
+    rows.filter(own).forEach(row => map.set(row.id || JSON.stringify(row), row));
+    return Array.from(map.values());
+  };
+  return {
+    students: students.map(({ socraticLogs: _logs, learningEvents: _events, ...metadata }) => metadata),
+    socraticLogs: dedupe([...(data.socraticLogs || []), ...(data.socraticLog ? [data.socraticLog] : []), ...students.flatMap(row => row.socraticLogs || [])]),
+    learningEvents: dedupe([...(data.learningEvents || []), ...(data.learningEvent ? [data.learningEvent] : []), ...students.flatMap(row => row.learningEvents || [])]),
+  };
+}
+// Validate nested fields too: server limits apply to each string, array and node.
+function syncPayloadFits(value: unknown): boolean {
+  let nodes = 0;
+  const visit = (item: unknown, depth: number): boolean => {
+    if (++nodes > 9000 || depth > 30) return false;
+    if (typeof item === 'string') return item.length <= 16000;
+    if (!item || typeof item !== 'object') return true;
+    if (Array.isArray(item) && item.length > 500) return false;
+    return Object.values(item).every(child => visit(child, depth + 1));
+  };
+  try { return visit(value, 0) && JSON.stringify(value).length <= 200000; }
+  catch { return false; }
+}
+async function sendOwnAnalyticsBatches(rows: AnalyticsBatch, identity: AnalyticsIdentity): Promise<void> {
+  let batch: AnalyticsBatch = { students: [], socraticLogs: [], learningEvents: [] };
+  let count = 0;
+  const flush = async (): Promise<boolean> => {
+    if (!count) return true;
+    if (!isCurrentIdentity(identity)) return false;
+    const response = await sendAnalyticsRequest('/api/analytics/sync', identity, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(batch),
     });
-  } catch (e) {}
+    batch = { students: [], socraticLogs: [], learningEvents: [] };
+    count = 0;
+    return !!response?.ok && isCurrentIdentity(identity);
+  };
+  for (const key of ['students', 'socraticLogs', 'learningEvents'] as const) {
+    for (const row of rows[key]) {
+      if (!isCurrentIdentity(identity)) return;
+      const singleton = { students: [], socraticLogs: [], learningEvents: [], [key]: [row] };
+      if (!syncPayloadFits(singleton)) {
+        notifyAnalyticsSyncError('일부 학습 기록이 전송 크기 제한을 초과했습니다. 원본은 브라우저에 보존되어 있으며 잘라서 전송하지 않았습니다.');
+        continue;
+      }
+      const candidate = { ...batch, [key]: [...batch[key], row] };
+      if (count >= 40 || !syncPayloadFits(candidate)) {
+        if (!await flush()) return;
+      }
+      // Each branch keeps the collection's concrete TypeScript row type.
+      if (key === 'students') batch.students.push(row as StudentActivity);
+      else if (key === 'socraticLogs') batch.socraticLogs.push(row as SocraticSummary);
+      else batch.learningEvents.push(row as LearningEvent);
+      count += 1;
+    }
+  }
+  await flush();
 }
 
 /**
- * Universal Auto-Sync: Guarantees that ALL locally accumulated student logs & reflections
- * are immediately uploaded to both Backend Server & Firestore DB so teachers can see them.
+ * Async Sync activity data to backend server for cross-browser admin tracking
+ */
+export async function syncAnalyticsToServer(data: AnalyticsSyncData): Promise<void> {
+  const identity = captureIdentity();
+  if (!identity.verified || !identity.email) return;
+  try {
+    const rows = ownSyncRows(data, identity);
+    await sendOwnAnalyticsBatches(rows, identity);
+    if (isCurrentIdentity(identity)) notifyAnalyticsUpdated();
+  } catch {
+    if (isCurrentIdentity(identity)) notifyAnalyticsSyncError('학습 기록 동기화 중 오류가 발생했습니다. 브라우저의 원본 기록은 보존되어 있습니다.');
+  }
+}
+
+/**
+ * Auto-sync only the currently verified account's own local records.
+ * Administrator visibility does not grant permission to replay other accounts' browser caches.
  */
 export async function autoSyncAllLocalDataToCloud(): Promise<void> {
+  const identity = captureIdentity();
+  if (!identity.verified || !identity.email) return;
   try {
-    const localStudents = getStoredStudentActivities();
-    const localSocratic = getStoredSocraticSummaries();
-    const localEvents = getStoredLearningEvents();
+    const ownIdentity = { ...identity, admin: false };
+    const localStudents = filterStudents(getStoredStudentActivities(), ownIdentity);
+    const localSocratic = getStoredSocraticSummaries().filter(row => normalizeEmail(row.studentEmail) === identity.email);
+    const localEvents = getStoredLearningEvents().filter(row => normalizeEmail(row.studentEmail) === identity.email);
 
     if (localStudents.length === 0 && localSocratic.length === 0 && localEvents.length === 0) {
       return;
     }
 
-    // 1. Bulk push to Backend Server API
-    await fetch('/api/analytics/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        students: localStudents,
-        socraticLogs: localSocratic,
-        learningEvents: localEvents,
-      }),
-    }).catch(() => {});
+    // Metadata is sent separately; nested records replay as deduplicated top-level logs.
+    const rows = ownSyncRows({ students: localStudents, socraticLogs: localSocratic, learningEvents: localEvents }, identity);
+    await sendOwnAnalyticsBatches(rows, identity);
+
+    if (!isCurrentIdentity(identity)) return;
 
     // 2. Parallel upload to Firestore
-    localSocratic.forEach((log) => {
+    rows.socraticLogs.forEach((log) => {
       if (log && log.id) {
-        setDoc(doc(db, 'socratic_logs', log.id), log, { merge: true }).catch(() => {});
+        safeSetDoc(doc(db, 'socratic_logs', log.id), log, { merge: true }).catch(() => { if (isCurrentIdentity(identity)) notifyAnalyticsSyncError('학습 기록 클라우드 저장에 실패했습니다. 브라우저의 원본 기록은 보존되어 있습니다.'); });
       }
     });
 
-    localEvents.forEach((ev) => {
+    rows.learningEvents.forEach((ev) => {
       if (ev && ev.id) {
-        setDoc(doc(db, 'learningEvents', ev.id), ev, { merge: true }).catch(() => {});
+        safeSetDoc(doc(db, 'learningEvents', ev.id), ev, { merge: true }).catch(() => { if (isCurrentIdentity(identity)) notifyAnalyticsSyncError('학습 기록 클라우드 저장에 실패했습니다. 브라우저의 원본 기록은 보존되어 있습니다.'); });
       }
     });
 
-    localStudents.forEach((std) => {
+    rows.students.forEach((std) => {
       if (std && std.email) {
         const docId = std.email.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
-        setDoc(doc(db, 'students', docId), std, { merge: true }).catch(() => {});
+        safeSetDoc(doc(db, 'students', docId), std, { merge: true }).catch(() => { if (isCurrentIdentity(identity)) notifyAnalyticsSyncError('학습 기록 클라우드 저장에 실패했습니다. 브라우저의 원본 기록은 보존되어 있습니다.'); });
       }
     });
-  } catch (e) {}
+  } catch {
+    if (isCurrentIdentity(identity)) notifyAnalyticsSyncError('학습 기록 동기화 중 오류가 발생했습니다. 브라우저의 원본 기록은 보존되어 있습니다.');
+  }
 }
 
 // Background Firestore cache to avoid slow network blocking
@@ -198,6 +357,8 @@ async function fetchFirestoreWithTimeout(timeoutMs = 3500): Promise<{
   socraticLogs: SocraticSummary[];
   learningEvents: LearningEvent[];
 }> {
+  const identity = captureIdentity();
+  if (!identity.verified || !identity.email) return emptyAnalyticsCache();
   const now = Date.now();
   // Use cached Firestore data if fetched within last 5 seconds to avoid API latency
   if (now - firestoreCache.lastFetched < 5000 && firestoreCache.students.length > 0) {
@@ -210,9 +371,9 @@ async function fetchFirestoreWithTimeout(timeoutMs = 3500): Promise<{
     const learningEvents: LearningEvent[] = [];
 
     const [stdSnap, socSnap, evtSnap] = await Promise.allSettled([
-      getDocs(collection(db, 'students')),
-      getDocs(collection(db, 'socratic_logs')),
-      getDocs(collection(db, 'learningEvents')),
+      getDocs(ownerQuery('students', 'email', identity)),
+      getDocs(ownerQuery('socratic_logs', 'studentEmail', identity)),
+      getDocs(ownerQuery('learningEvents', 'studentEmail', identity)),
     ]);
 
     if (stdSnap.status === 'fulfilled' && !stdSnap.value.empty) {
@@ -245,7 +406,10 @@ async function fetchFirestoreWithTimeout(timeoutMs = 3500): Promise<{
       });
     }
 
-    const result = { students, socraticLogs, learningEvents, lastFetched: Date.now() };
+    if (!isCurrentIdentity(identity)) return emptyAnalyticsCache();
+    const result = { students: filterStudents(students, identity),
+      socraticLogs: socraticLogs.filter(row => canReadOwner(row.studentEmail, identity)),
+      learningEvents: learningEvents.filter(row => canReadOwner(row.studentEmail, identity)), lastFetched: Date.now() };
     firestoreCache = result;
     notifyAnalyticsUpdated();
     return result;
@@ -255,9 +419,10 @@ async function fetchFirestoreWithTimeout(timeoutMs = 3500): Promise<{
     students: StudentActivity[];
     socraticLogs: SocraticSummary[];
     learningEvents: LearningEvent[];
-  }>((resolve) => setTimeout(() => resolve(firestoreCache), timeoutMs));
+  }>((resolve) => setTimeout(() => resolve(isCurrentIdentity(identity) ? firestoreCache : emptyAnalyticsCache()), timeoutMs));
 
-  return Promise.race([fetchPromise, timeoutPromise]);
+  const result = await Promise.race([fetchPromise, timeoutPromise]);
+  return isCurrentIdentity(identity) ? result : emptyAnalyticsCache();
 }
 
 /**
@@ -271,6 +436,9 @@ export async function fetchServerAnalyticsData(): Promise<{
   socraticLogs: SocraticSummary[];
   learningEvents: LearningEvent[];
 }> {
+  const identity = captureIdentity();
+  if (!identity.verified || !identity.email) return emptyAnalyticsCache();
+  let accessDenied = false;
   let serverStudents: StudentActivity[] = [];
   let serverSocraticLogs: SocraticSummary[] = [];
   let serverLearningEvents: LearningEvent[] = [];
@@ -278,7 +446,10 @@ export async function fetchServerAnalyticsData(): Promise<{
   // 1. Fast Path: High-speed Backend Server API (10~20ms response)
   const backendPromise = (async () => {
     try {
-      const res = await fetch('/api/analytics/data');
+      const res = await sendAnalyticsRequest('/api/analytics/data', identity);
+      if (!res) return;
+      if (res.status === 401 || res.status === 403) accessDenied = true;
+      if (!isCurrentIdentity(identity)) return;
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
@@ -295,6 +466,7 @@ export async function fetchServerAnalyticsData(): Promise<{
 
   await Promise.allSettled([backendPromise, firestorePromise]);
 
+  if (!isCurrentIdentity(identity) || accessDenied) return emptyAnalyticsCache();
   const { students: firestoreStudents, socraticLogs: firestoreSocratic, learningEvents: firestoreEvents } = firestoreCache;
 
   // 3. LocalStorage
@@ -408,11 +580,16 @@ export async function fetchServerAnalyticsData(): Promise<{
     const actualSocCount = Array.from(socMap.values()).filter((soc) => {
       if (!soc || !soc.studentEmail) return false;
       const socKey = soc.studentEmail.toLowerCase().trim();
-      return socKey === key || (socKey.includes('@') && key.includes('@') && socKey.split('@')[0] === key.split('@')[0]);
+      return socKey === key;
     }).length;
     std.socraticQuestionsCount = actualSocCount;
   });
 
+  if (!isCurrentIdentity(identity)) return emptyAnalyticsCache();
+  for (const [key, row] of studentMap) if (!canReadOwner(row.email, identity)) studentMap.delete(key);
+  for (const [key, row] of socMap) if (!canReadOwner(row.studentEmail, identity)) socMap.delete(key);
+  for (const [key, row] of eventMap) if (!canReadOwner(row.studentEmail, identity)) eventMap.delete(key);
+  for (const [key, row] of studentMap) studentMap.set(key, filterStudents([row], identity)[0]);
   // CRITICAL: Persist all merged Socratic logs and students into current browser's localStorage
   // This guarantees that even if the serverless backend restarts, all data remains permanently intact in the teacher's browser!
   try {
@@ -420,10 +597,10 @@ export async function fetchServerAnalyticsData(): Promise<{
       const allSocs = Array.from(socMap.values());
       const allStds = Array.from(studentMap.values());
       if (allSocs.length > 0) {
-        localStorage.setItem(STORAGE_KEY_SOCRATIC, JSON.stringify(allSocs.slice(0, 500)));
+        persistAnalyticsRows(STORAGE_KEY_SOCRATIC, allSocs);
       }
       if (allStds.length > 0) {
-        localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(allStds.slice(0, 500)));
+        persistAnalyticsRows(STORAGE_KEY_STUDENTS, allStds);
       }
     }
   } catch (e) {}
@@ -432,7 +609,7 @@ export async function fetchServerAnalyticsData(): Promise<{
   autoSyncAllLocalDataToCloud();
 
   return {
-    students: Array.from(studentMap.values()),
+    students: filterStudents(Array.from(studentMap.values()), identity),
     socraticLogs: Array.from(socMap.values()),
     learningEvents: Array.from(eventMap.values()),
   };
@@ -449,6 +626,8 @@ const ALL_STUDENT_STORAGE_KEYS = [
  * Get stored student activities from localStorage with legacy key fallback & deep scan
  */
 export function getStoredStudentActivities(): StudentActivity[] {
+  const identity = captureIdentity();
+  if (!identity.verified || !identity.email) return [];
   const map = new Map<string, StudentActivity>();
 
   ALL_STUDENT_STORAGE_KEYS.forEach((key) => {
@@ -480,7 +659,7 @@ export function getStoredStudentActivities(): StudentActivity[] {
     } catch {}
   });
 
-  return Array.from(map.values());
+  return filterStudents(Array.from(map.values()));
 }
 
 /**
@@ -547,9 +726,9 @@ export function ensureStudentRecord(emailInput?: string | null, nameInput?: stri
   }
 
   try {
-    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
+    persistAnalyticsRows(STORAGE_KEY_STUDENTS, students);
     const docId = cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
-    setDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
+    safeSetDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
   } catch (e) {}
 
   return { students, idx };
@@ -559,8 +738,11 @@ export function ensureStudentRecord(emailInput?: string | null, nameInput?: stri
  * Async fetch student activities from Firebase Firestore with LocalStorage fallback
  */
 export async function fetchFirestoreStudentActivities(): Promise<StudentActivity[]> {
+  const identity = captureIdentity();
+  if (!identity.verified || !identity.email) return [];
   try {
-    const querySnapshot = await getDocs(collection(db, 'students'));
+    const querySnapshot = await getDocs(ownerQuery('students', 'email', identity));
+    if (!isCurrentIdentity(identity)) return [];
     if (querySnapshot.empty) {
       return getStoredStudentActivities();
     }
@@ -568,9 +750,9 @@ export async function fetchFirestoreStudentActivities(): Promise<StudentActivity
     querySnapshot.forEach((docSnap) => {
       list.push(docSnap.data() as StudentActivity);
     });
-    return list.length > 0 ? list : getStoredStudentActivities();
+    return filterStudents(list, identity);
   } catch (e) {
-    return getStoredStudentActivities();
+    return isCurrentIdentity(identity) ? getStoredStudentActivities() : [];
   }
 }
 
@@ -587,6 +769,8 @@ const ALL_SOCRATIC_STORAGE_KEYS = [
  * with comprehensive normalization and missing-field repair
  */
 export function getStoredSocraticSummaries(): SocraticSummary[] {
+  const identity = captureIdentity();
+  if (!identity.verified || !identity.email) return [];
   const socMap = new Map<string, SocraticSummary>();
 
   ALL_SOCRATIC_STORAGE_KEYS.forEach((key) => {
@@ -687,15 +871,18 @@ export function getStoredSocraticSummaries(): SocraticSummary[] {
     } catch (e) {}
   }
 
-  return Array.from(socMap.values());
+  return Array.from(socMap.values()).filter(row => canReadOwner(row.studentEmail));
 }
 
 /**
  * Async fetch Socratic summaries from Firebase Firestore
  */
 export async function fetchFirestoreSocraticSummaries(): Promise<SocraticSummary[]> {
+  const identity = captureIdentity();
+  if (!identity.verified || !identity.email) return [];
   try {
-    const querySnapshot = await getDocs(collection(db, 'socratic_logs'));
+    const querySnapshot = await getDocs(ownerQuery('socratic_logs', 'studentEmail', identity));
+    if (!isCurrentIdentity(identity)) return [];
     if (querySnapshot.empty) {
       return getStoredSocraticSummaries();
     }
@@ -703,9 +890,9 @@ export async function fetchFirestoreSocraticSummaries(): Promise<SocraticSummary
     querySnapshot.forEach((docSnap) => {
       list.push(docSnap.data() as SocraticSummary);
     });
-    return list;
+    return list.filter(row => canReadOwner(row.studentEmail, identity));
   } catch (e) {
-    return getStoredSocraticSummaries();
+    return isCurrentIdentity(identity) ? getStoredSocraticSummaries() : [];
   }
 }
 
@@ -725,9 +912,9 @@ export function recordUserLogin(user: { email?: string | null; displayName?: str
   }
 
   try {
-    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
+    persistAnalyticsRows(STORAGE_KEY_STUDENTS, students);
     const docId = email.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
-    setDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
+    safeSetDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
     syncAnalyticsToServer({ student: students[idx] });
   } catch (e) {}
 
@@ -802,10 +989,10 @@ export async function recordSocraticQuestion(data: {
   storedEvents.unshift(newLearningEvent);
 
   try {
-    localStorage.setItem(STORAGE_KEY_SOCRATIC, JSON.stringify(summaries.slice(0, 100)));
-    localStorage.setItem(STORAGE_KEY_LEARNING_EVENTS, JSON.stringify(storedEvents.slice(0, 500)));
-    setDoc(doc(db, 'socratic_logs', newLog.id), newLog).catch(() => {});
-    setDoc(doc(db, 'learningEvents', newLearningEvent.id), newLearningEvent).catch(() => {});
+    persistAnalyticsRows(STORAGE_KEY_SOCRATIC, summaries);
+    persistAnalyticsRows(STORAGE_KEY_LEARNING_EVENTS, storedEvents);
+    safeSetDoc(doc(db, 'socratic_logs', newLog.id), newLog).catch(() => {});
+    safeSetDoc(doc(db, 'learningEvents', newLearningEvent.id), newLearningEvent).catch(() => {});
   } catch (e) {}
 
   // Automatically update student activity count and embed socratic logs directly in student record
@@ -829,9 +1016,9 @@ export async function recordSocraticQuestion(data: {
   }
 
   try {
-    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
+    persistAnalyticsRows(STORAGE_KEY_STUDENTS, students);
     const docId = email.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
-    setDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
+    safeSetDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
     await syncAnalyticsToServer({
       student: students[idx],
       socraticLog: newLog,
@@ -852,9 +1039,9 @@ export function recordGeneratorUsage(studentEmail?: string | null): void {
   students[idx].totalDwellTimeMinutes += 5;
 
   try {
-    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
+    persistAnalyticsRows(STORAGE_KEY_STUDENTS, students);
     const docId = email.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
-    setDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
+    safeSetDoc(doc(db, 'students', docId), students[idx], { merge: true }).catch(() => {});
     syncAnalyticsToServer({ student: students[idx] });
   } catch (e) {}
 }
@@ -920,6 +1107,8 @@ const ALL_EVENT_STORAGE_KEYS = [
 ];
 
 export function getStoredLearningEvents(): LearningEvent[] {
+  const identity = captureIdentity();
+  if (!identity.verified || !identity.email) return [];
   const eventMap = new Map<string, LearningEvent>();
 
   ALL_EVENT_STORAGE_KEYS.forEach((key) => {
@@ -961,7 +1150,7 @@ export function getStoredLearningEvents(): LearningEvent[] {
     } catch {}
   });
 
-  return Array.from(eventMap.values());
+  return Array.from(eventMap.values()).filter(row => canReadOwner(row.studentEmail));
 }
 
 export async function recordLearningEvent(event: Omit<LearningEvent, 'id' | 'timestamp'>): Promise<LearningEvent[]> {
@@ -974,9 +1163,9 @@ export async function recordLearningEvent(event: Omit<LearningEvent, 'id' | 'tim
 
   events.unshift(newEvent);
   try {
-    localStorage.setItem(STORAGE_KEY_LEARNING_EVENTS, JSON.stringify(events.slice(0, 500)));
+    persistAnalyticsRows(STORAGE_KEY_LEARNING_EVENTS, events);
     const docId = `${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    setDoc(doc(db, 'learningEvents', docId), newEvent, { merge: true }).catch(() => {});
+    safeSetDoc(doc(db, 'learningEvents', docId), newEvent, { merge: true }).catch(() => {});
     syncAnalyticsToServer({ learningEvent: newEvent });
 
     if (event.studentEmail) {
@@ -986,9 +1175,9 @@ export async function recordLearningEvent(event: Omit<LearningEvent, 'id' | 'tim
         students[idx].learningEvents.unshift(newEvent);
         students[idx].learningEvents = students[idx].learningEvents.slice(0, 100);
       }
-      localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
+      persistAnalyticsRows(STORAGE_KEY_STUDENTS, students);
       const sDocId = event.studentEmail.toLowerCase().replace(/[^a-zA-Z0-9]/g, '_');
-      setDoc(doc(db, 'students', sDocId), students[idx], { merge: true }).catch(() => {});
+      safeSetDoc(doc(db, 'students', sDocId), students[idx], { merge: true }).catch(() => {});
     }
   } catch (e) {}
 

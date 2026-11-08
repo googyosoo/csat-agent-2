@@ -1,3 +1,4 @@
+import { createRecordSecurity } from '../server/record-security.mjs';
 // server.ts
 import express from "express";
 import path from "path";
@@ -8,6 +9,9 @@ dotenv.config();
 var app = express();
 var PORT = 3e3;
 app.use(express.json({ limit: "10mb" }));
+
+// Validate Firebase identity and scope records before any data handler.
+app.use(createRecordSecurity());
 function cleanJsonString(str) {
   if (!str) return "";
   let cleaned = str.trim();
