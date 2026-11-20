@@ -28,3 +28,14 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Temporary local docs and inspection scripts
+*.hwpx
+*.hwp
+*.pdf
+hwpx_build/
+hwpx_extracted/
+inspect_tbl1_xml.py
+.harness/
+desktop_preview.png
+mobile_preview.png

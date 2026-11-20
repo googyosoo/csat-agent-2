@@ -70,8 +70,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartGuestPreview })
           </p>
         </div>
 
-        {/* Primary Login Action Button */}
-        <div className="space-y-2 pt-2">
+        {/* Primary Login & Guest Action Buttons */}
+        <div className="space-y-3 pt-2">
           {loginError && (
             <div className="max-w-md mx-auto p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 rounded-xl text-xs flex items-center space-x-2 text-left">
               <i className="fa-solid fa-triangle-exclamation text-rose-400 shrink-0"></i>
@@ -79,19 +79,56 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onStartGuestPreview })
             </div>
           )}
 
-          <div className="inline-flex flex-col items-center">
+          <div className="inline-flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
               onClick={handleLogin}
               disabled={isLoggingIn}
-              className="px-8 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-extrabold text-sm sm:text-base rounded-2xl shadow-xl shadow-indigo-950/80 transition-all flex items-center space-x-3 disabled:opacity-50 transform hover:-translate-y-0.5"
+              className="px-8 py-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-extrabold text-sm sm:text-base rounded-2xl shadow-xl shadow-indigo-950/80 transition-all flex items-center space-x-3 disabled:opacity-50 transform hover:-translate-y-0.5 cursor-pointer"
             >
               <i className={`fa-brands fa-google text-lg ${isLoggingIn ? 'fa-spin' : ''}`}></i>
               <span>{isLoggingIn ? '인증 진행 중...' : 'Google 계정으로 시작하기'}</span>
             </button>
-            <span className="text-[11px] text-slate-400 mt-2 font-mono flex items-center space-x-1">
-              <i className="fa-solid fa-globe text-[10px] text-blue-400"></i>
-              <span>모든 Google 계정으로 즉시 로그인 및 학습 가능</span>
-            </span>
+            <button
+              onClick={onStartGuestPreview}
+              className="px-6 py-3.5 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 text-slate-200 font-bold text-sm sm:text-base rounded-2xl transition-all flex items-center space-x-2 cursor-pointer shadow-lg"
+            >
+              <i className="fa-solid fa-compass text-blue-400"></i>
+              <span>로그인 없이 게스트로 둘러보기</span>
+            </button>
+          </div>
+          <span className="text-[11px] text-slate-400 font-mono flex items-center justify-center space-x-1">
+            <i className="fa-solid fa-globe text-[10px] text-blue-400"></i>
+            <span>모든 Google 계정 또는 게스트 모드로 즉시 학습 가능</span>
+          </span>
+        </div>
+
+        {/* 4-Step Quick Start Guide for Students */}
+        <div className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-4 sm:p-5 text-left max-w-3xl mx-auto space-y-3">
+          <div className="flex items-center space-x-2 text-xs font-bold text-blue-300">
+            <i className="fa-solid fa-route"></i>
+            <span>학생 첫 이용 4단계 로드맵</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs">
+            <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/50">
+              <span className="text-blue-400 font-black">STEP 1</span>
+              <p className="font-bold text-slate-200 mt-1">지문 선택 및 정독</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">EBS 연계 지문 구문 분석과 음성 TTS 듣기</p>
+            </div>
+            <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/50">
+              <span className="text-amber-400 font-black">STEP 2</span>
+              <p className="font-bold text-slate-200 mt-1">소크라테스 문답</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">핵심 논리와 근거를 스스로 파악하는 문답 훈련</p>
+            </div>
+            <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/50">
+              <span className="text-emerald-400 font-black">STEP 3</span>
+              <p className="font-bold text-slate-200 mt-1">수능 변형문항 풀이</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">빈칸·어법 등 실전 6대 유형 문제 풀이 및 해설</p>
+            </div>
+            <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800/50">
+              <span className="text-purple-400 font-black">STEP 4</span>
+              <p className="font-bold text-slate-200 mt-1">오답노트와 세특 축적</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">취약점 자동 분류와 학습 이력 자산화</p>
+            </div>
           </div>
         </div>
 
